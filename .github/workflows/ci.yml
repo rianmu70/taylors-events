@@ -1,0 +1,43 @@
+# Runs on every push and pull request: loads the database, runs the 19
+# database checks and lints every PHP file. A red cross on GitHub means
+# something broke before it reaches the demo.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      MYSQL_PWD: root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_mysql, gd, mbstring
+
+      - name: Load schema and seed
+        run: |
+          mysql -h127.0.0.1 -uroot < database/schema.sql
+          mysql -h127.0.0.1 -uroot < database/seed.sql
+
+      - name: Database checks
+        run: bash scripts/verify_database.sh -h127.0.0.1 -uroot
+
+      - name: PHP syntax check
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -r -n1 php -l
