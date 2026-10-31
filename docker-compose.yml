@@ -1,0 +1,44 @@
+# One-command local environment:  docker compose up --build
+# App:  http://localhost:8000     MySQL:  localhost:3307 (root / root)
+services:
+  db:
+    image: mysql:8.0
+    command:
+      - --default-time-zone=+08:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./docker/mysql/03-app-user.sql:/docker-entrypoint-initdb.d/03-app-user.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    ports:
+      - "8000:80"
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: taylors_events
+      DB_USER: taylors_app
+      DB_PASS: taylors_dev_password
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

@@ -1,0 +1,10 @@
+.env
+/storage/uploads/*
+/storage/logs/*
+/storage/cache/*
+.env.docker
+!/storage/**/.gitkeep
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
