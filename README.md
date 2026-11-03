@@ -1,6 +1,6 @@
-# Taylor's Events — Campus Event Management Platform
+# Taylor's Events: Campus Event Management Platform
 
-ITS64504 Web Application Programming — Group Assignment, Group 4.
+ITS64504 Web Application Programming. Group Assignment, Group 4.
 Pure PHP 8.2+ (custom OOP micro-framework, no back-end framework), MySQL 8, HTML/CSS/JavaScript.
 
 ## Folder structure
@@ -135,7 +135,7 @@ Results are in `docs/PERFORMANCE.md` (up to about 1,900x faster).
 | Rating after attendance | Demo student attended "Intro to Python" but has not rated it |
 | Soft delete + audit trail | "Inter-Club Chess Tournament" |
 
-## Group 4 — module ownership (for peer review)
+## Group 4 module ownership (for peer review)
 
 | Member | Student ID | Ownership |
 |---|---|---|
