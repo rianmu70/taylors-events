@@ -1,6 +1,6 @@
 # Taylor's Events — Campus Event Management Platform
 
-ITS64504 Web Application Programming — Group Assignment.
+ITS64504 Web Application Programming — Group Assignment, Group 4.
 Pure PHP 8.2+ (custom OOP micro-framework, no back-end framework), MySQL 8, HTML/CSS/JavaScript.
 
 ## Folder structure
@@ -135,13 +135,13 @@ Results are in `docs/PERFORMANCE.md` (up to about 1,900x faster).
 | Rating after attendance | Demo student attended "Intro to Python" but has not rated it |
 | Soft delete + audit trail | "Inter-Club Chess Tournament" |
 
-## Module ownership (for peer review)
+## Group 4 — module ownership (for peer review)
 
-| Member | Ownership |
-|---|---|
-| Member 1 | Database, infrastructure, PHP foundation (router, database layer, views, language file, error handling, tests) |
-| Member 2 | Sessions, sign-in and registration, roles, security middleware (CSRF, rate limiting, headers) |
-| Member 3 | Booking, waitlist, venue clash, event lifecycle, tickets and check-in, front-end pages |
+| Member | Student ID | Ownership |
+|---|---|---|
+| Mubarak Rian Abdulmuhsen Ahmed | 374215 | Database, infrastructure, PHP foundation (router, database layer, views, language file, error handling, tests) |
+| Danah Abdul Rahim Kollochi | 388012 | Sessions, sign-in and registration, roles, security middleware (CSRF, rate limiting, headers) |
+| Banda Shalom Z | 386232 | Booking, waitlist, venue clash, event lifecycle, tickets and check-in, front-end pages |
 
 Each member commits through their own branch and pull requests so the Git
 history reflects individual contribution. See `CONTRIBUTING.md`.
