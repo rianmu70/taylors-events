@@ -8,11 +8,13 @@ Pure PHP 8.2+ (custom OOP micro-framework, no back-end framework), MySQL 8, HTML
 ```
 taylors-events/
 ├── public/                  # Web root: the ONLY folder exposed by the web server
-│   ├── index.php            # Front controller (single entry point)       [Phase 2]
-│   └── assets/{css,js,img}  # Static files                                [Phase 4]
+│   ├── index.php            # Front controller (single entry point)       [done]
+│   └── assets/{css,js,img}  # Static files; css/app.css holds the tokens  [Phase 4]
 ├── app/
-│   ├── Core/                # Router, Request, Response, Container, Database,
-│   │                        # Session handler, Env loader, View renderer  [Phase 2]
+│   ├── bootstrap.php        # Autoloader, .env, config, error handling    [done]
+│   ├── helpers.php          # e(), t(), url(), asset(), view(), abort()   [done]
+│   ├── Core/                # Router, Request, Response, Database, View,
+│   │                        # Lang, Env, Config, Logger, error pages      [done]
 │   ├── Middleware/          # Auth, Role (RBAC), CSRF, RateLimit, Headers [Phase 2]
 │   ├── Controllers/
 │   │   ├── Web/             # Return HTML pages                           [Phase 3]
@@ -20,9 +22,10 @@ taylors-events/
 │   ├── Models/              # Data access (prepared statements only)      [Phase 3]
 │   ├── Services/            # Business logic: Booking, VenueClash,
 │   │                        # EventStateMachine, TicketSigner, Audit      [Phase 3]
-│   ├── Views/{layouts,partials,pages}  # PHP templates, escaped output    [Phase 4]
+│   ├── Views/{layouts,partials,pages,errors}  # Templates, escaped output [Phase 4]
+│   │   └── lang/en.php      # Every label and message in one file         [done]
 │   └── Tests/               # In-app automated test lab                   [Phase 5]
-├── config/                  # app.php, routes.php                         [Phase 2]
+├── config/                  # app.php (settings), routes.php (all URLs)   [done]
 ├── database/
 │   ├── schema.sql           # Tables, constraints, indexes, triggers, views
 │   ├── seed.sql             # Realistic demo data (relative dates)
@@ -32,11 +35,14 @@ taylors-events/
 │   ├── logs/  cache/
 ├── scripts/
 │   ├── verify_database.sh   # 19 automated database checks
+│   ├── test_core.php        # 55 tests for the PHP foundation
+│   ├── smoke_test.sh        # 16 end-to-end HTTP checks
 │   ├── reset_demo.sh        # Fresh demo data in one command
 │   └── perf/                # Index performance test (separate database)
-├── docs/                    # ERD, performance report, proposal notes
+├── docs/                    # ERD, performance, foundation guide, proposal notes
 ├── docker/ + docker-compose.yml  # One-command environment
 ├── .github/                 # CI workflow and pull request template
+├── .htaccess                # Keeps everything outside public/ private on Apache
 ├── .env.example             # Copy to .env (git-ignored)
 └── README.md
 ```
@@ -54,7 +60,7 @@ docker compose up --build
 ```
 
 The database is created and seeded automatically. App on
-http://localhost:8000 (from Phase 2), MySQL on port 3307.
+http://localhost:8000, MySQL on port 3307.
 
 ## Setup without Docker
 
@@ -63,8 +69,26 @@ mysql -u root -p < database/schema.sql
 mysql -u root -p < database/seed.sql
 mysql -u root -p < database/create_app_user.sql
 cp .env.example .env        # then fill DB_PASS, APP_KEY, TICKET_SIGNING_KEY
-php -S localhost:8000 -t public   # available from Phase 2
+php -S localhost:8000 -t public public/index.php
 ```
+
+Open http://localhost:8000. To check the setup, open
+http://localhost:8000/api/health: `"database":"ok"` means PHP, the
+connection and the schema all work.
+
+**XAMPP / WAMP:** the project folder can sit directly in `htdocs`, e.g.
+http://localhost/taylors-events/. The root `.htaccess` sends every request
+into `public/`, so `.env`, logs and source code cannot be downloaded.
+
+## Tests
+
+```bash
+bash scripts/verify_database.sh -u root -p   # 19 database rule checks
+php scripts/test_core.php                    # 55 PHP foundation tests
+bash scripts/smoke_test.sh                   # 16 HTTP checks on the running app
+```
+
+All three run automatically on GitHub for every push.
 
 ## Verify the database
 
@@ -115,9 +139,9 @@ Results are in `docs/PERFORMANCE.md` (up to about 1,900x faster).
 
 | Member | Ownership |
 |---|---|
-| Member A | Core framework, security middleware, sessions, auth |
-| Member B | Database, booking/waitlist, venue clash, state machine, tickets, test lab |
-| Member C | Front-end design system, pages, dashboard, QR scanner, presentation flow |
+| Member 1 | Database, infrastructure, PHP foundation (router, database layer, views, language file, error handling, tests) |
+| Member 2 | Sessions, sign-in and registration, roles, security middleware (CSRF, rate limiting, headers) |
+| Member 3 | Booking, waitlist, venue clash, event lifecycle, tickets and check-in, front-end pages |
 
 Each member commits through their own branch and pull requests so the Git
 history reflects individual contribution. See `CONTRIBUTING.md`.

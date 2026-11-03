@@ -1,6 +1,7 @@
 # Runs on every push and pull request: loads the database, runs the 19
-# database checks and lints every PHP file. A red cross on GitHub means
-# something broke before it reaches the demo.
+# database checks, lints every PHP file, then tests the PHP foundation and
+# the running app over HTTP. A red cross on GitHub means something broke
+# before it reaches the demo.
 name: CI
 
 on:
@@ -33,6 +34,8 @@ jobs:
 
       - name: Load schema and seed
         run: |
+          # Same time zone as the campus and docker-compose.yml
+          mysql -h127.0.0.1 -uroot -e "SET GLOBAL time_zone = '+08:00'"
           mysql -h127.0.0.1 -uroot < database/schema.sql
           mysql -h127.0.0.1 -uroot < database/seed.sql
 
@@ -41,3 +44,22 @@ jobs:
 
       - name: PHP syntax check
         run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -r -n1 php -l
+
+      - name: Reload fresh demo data
+        run: |
+          mysql -h127.0.0.1 -uroot < database/schema.sql
+          mysql -h127.0.0.1 -uroot < database/seed.sql
+
+      - name: PHP foundation tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASS: root
+        run: php scripts/test_core.php
+
+      - name: HTTP smoke test
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASS: root
+        run: bash scripts/smoke_test.sh

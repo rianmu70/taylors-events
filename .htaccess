@@ -1,0 +1,23 @@
+# Protects the project when the whole folder sits inside an Apache web root
+# (XAMPP htdocs, WAMP www). Without this file, .env (database password),
+# logs and source code could be downloaded.
+#
+# Every request is sent into public/, so only the app is reachable:
+#   http://localhost/taylors-events/          -> the app
+#   http://localhost/taylors-events/.env      -> the app's 404 page
+#
+# Docker and "php -S ... -t public" already serve public/ only; this file is
+# not read there.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^public/ - [L]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# No mod_rewrite: refuse everything rather than expose files.
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
