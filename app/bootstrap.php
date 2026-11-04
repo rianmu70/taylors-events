@@ -27,6 +27,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 require BASE_PATH . '/app/helpers.php';
+require BASE_PATH . '/app/Support/auth_helpers.php';   // csrf_field(), csrf_token(), auth_user(), auth_role()
 
 use App\Core\App;
 use App\Core\Config;
