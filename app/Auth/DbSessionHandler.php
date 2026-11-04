@@ -45,16 +45,18 @@ final class DbSessionHandler implements SessionHandlerInterface
     public function write(string $id, string $data): bool
     {
         $uid = isset($_SESSION['uid']) ? (int) $_SESSION['uid'] : null;
+        $ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP) ?: '0.0.0.0'; // column is NOT NULL
 
         // A request with a different User-Agent hash cannot overwrite an existing session row.
         Database::execute(
-            'INSERT INTO user_sessions (id, user_id, user_agent_hash, payload, last_activity)
-             VALUES (:id, :uid, :ua, :payload, NOW()) AS new
+            'INSERT INTO user_sessions (id, user_id, ip_address, user_agent_hash, payload, last_activity)
+             VALUES (:id, :uid, :ip, :ua, :payload, NOW()) AS new
              ON DUPLICATE KEY UPDATE
                user_id       = IF(user_sessions.user_agent_hash = new.user_agent_hash, new.user_id, user_sessions.user_id),
+               ip_address    = IF(user_sessions.user_agent_hash = new.user_agent_hash, new.ip_address, user_sessions.ip_address),
                payload       = IF(user_sessions.user_agent_hash = new.user_agent_hash, new.payload, user_sessions.payload),
                last_activity = IF(user_sessions.user_agent_hash = new.user_agent_hash, NOW(), user_sessions.last_activity)',
-            ['id' => $id, 'uid' => $uid, 'ua' => $this->uaHash, 'payload' => $data],
+            ['id' => $id, 'uid' => $uid, 'ip' => $ip, 'ua' => $this->uaHash, 'payload' => $data],
         );
         return true;
     }

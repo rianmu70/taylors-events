@@ -31,7 +31,7 @@ $qrText = TicketSigner::fromConfig()->sign($eventId, $registrationId, $nonce);
 ```
 
 The QR text is computed on demand from those three values. Do not store it.
-`registrations.ticket_nonce` must hold at least 32 characters (CHAR(32) or larger). I have not seen that column's size.
+`registrations.ticket_nonce` is CHAR(32) in your schema, which matches the 32-hex nonce.
 
 Scanner endpoint (Member 3):
 
@@ -54,3 +54,16 @@ The signature proves the text is genuine. It does not prove the seat is still va
 - Strict pattern before any crypto, with a 200 character cap, so odd scanner input cannot reach the HMAC code.
 - Format is versioned (`v1`) so it can change later without breaking the parser.
 - No expiry in the ticket: validity comes from the registration status and the event time in the database.
+
+## Mapping to ticket_scans.result (from your schema)
+
+| Situation | `result` value |
+|---|---|
+| `verify()` returned `malformed` or `bad_signature` | `invalid_signature` (registration_id NULL) |
+| Genuine ticket, but `event_id` is not the event being scanned | `wrong_event` |
+| Genuine ticket, registration is waitlisted or cancelled | `not_confirmed` |
+| Event is not currently live | `event_not_live` |
+| Already checked in | `duplicate` |
+| All checks pass, check-in recorded | `admitted` |
+
+Write one `ticket_scans` row for every scan, including rejected ones. Rows can never be updated or deleted, so they are your evidence trail.

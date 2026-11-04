@@ -42,13 +42,18 @@ Roles are explicit: `role:admin` does not let organizers in, and `role:organizer
 - Guests on a page go to `/login?next=...`; API routes get 401. Wrong role is 403, bad CSRF is 419, rate limited is 429 with `Retry-After`. All use your `ErrorRenderer`.
 - The per-account limiter (8 tries per 15 min) lets someone deliberately slow a victim's sign-ins. Accepted for this scope.
 
-## Schema assumptions (not in ERD.md): the tests will show which are wrong
+## Schema (checked against database/schema.sql)
 
-| Table | Assumed |
-|---|---|
-| `users` | `full_name`; no other NOT NULL column without a default |
-| `user_sessions` | `last_activity` DATETIME NOT NULL; `user_id` allows NULL |
-| `rate_limits` | `window_start` DATETIME NOT NULL; `blocked_until` DATETIME NULL |
+All column names now match the real tables. Two things the schema forced:
+- `user_sessions.ip_address` is NOT NULL, so the session handler writes the client IP.
+- `users.is_active` exists, so deactivated accounts cannot sign in and are signed out on their next request. Sign-in also sets `last_login_at`.
+
+Seeded accounts all use the password `Demo@12345` (admin@taylors.edu.my, organizer@taylors.edu.my, student@sd.taylors.edu.my).
+
+## Known side effect of global CSRF checking
+
+The CSRF check runs before routing, so a POST without a token to ANY URL returns 419, even when the URL would have been a 405 or 404.
+`scripts/smoke_test.sh` has a check "POST to a GET page is 405 with Allow header" that will now see 419. Send me smoke_test.sh and I will adjust that one check.
 
 ## Still to write
 

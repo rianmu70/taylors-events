@@ -242,6 +242,35 @@ check('a successful sign-in resets the failed-attempt counter', fn () => rolledB
     $res = Auth::attempt(req('POST', '/login'), $u['email'], $u['password']);
     return $res['ok'] === true && (int) Database::fetchValue('SELECT failed_login_count FROM users WHERE id = ?', [$u['id']]) === 0;
 }));
+check('a deactivated account cannot sign in', fn () => rolledBack(function () {
+    $u = makeUser();
+    Database::execute('UPDATE users SET is_active = 0 WHERE id = ?', [$u['id']]);
+    $res = Auth::attempt(req('POST', '/login'), $u['email'], $u['password']);
+    return $res['ok'] === false && !isset($_SESSION['uid']);
+}));
+check('a deactivated account is signed out on the next request', fn () => rolledBack(function () {
+    $app = testApp();
+    $u = makeUser();
+    $_SESSION = ['uid' => $u['id']];
+    Database::execute('UPDATE users SET is_active = 0 WHERE id = ?', [$u['id']]);
+    $res = $app->handle(req('GET', '/secret'));
+    return $res->status() === 302 && !isset($_SESSION['uid']);
+}));
+check('sign-in records last_login_at', fn () => rolledBack(function () {
+    $u = makeUser();
+    Auth::attempt(req('POST', '/login'), $u['email'], $u['password']);
+    return Database::fetchValue('SELECT last_login_at FROM users WHERE id = ?', [$u['id']]) !== null;
+}));
+check('seeded demo accounts sign in with Demo@12345 and keep their roles', fn () => rolledBack(function () {
+    $out = [];
+    foreach (['admin@taylors.edu.my' => 'admin', 'organizer@taylors.edu.my' => 'organizer', 'student@sd.taylors.edu.my' => 'student'] as $email => $role) {
+        freshSession();
+        $r = req('POST', '/login');
+        $res = Auth::attempt($r, $email, 'Demo@12345');
+        $out[$email] = $res['ok'] === true && ($r->attribute('user')['role'] ?? '') === $role;
+    }
+    return !in_array(false, $out, true) ? true : $out;
+}));
 check('too many attempts per account hit the rate limiter (retry_after)', fn () => rolledBack(function () {
     $u = makeUser();
     $last = [];

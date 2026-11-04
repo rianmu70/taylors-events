@@ -61,7 +61,7 @@ final class Auth
         $uid = (int) ($_SESSION['uid'] ?? 0);
         if ($uid > 0) {
             $row = Database::fetchOne(
-                'SELECT id, email, full_name, role, faculty_id FROM users WHERE id = ? AND deleted_at IS NULL',
+                'SELECT id, email, full_name, role, faculty_id FROM users WHERE id = ? AND deleted_at IS NULL AND is_active = 1',
                 [$uid],
             );
             if ($row === null) {
@@ -143,7 +143,7 @@ final class Auth
 
         $row = Database::fetchOne(
             'SELECT id, password_hash, (locked_until IS NOT NULL AND locked_until > NOW()) AS locked
-               FROM users WHERE email = ? AND deleted_at IS NULL',
+               FROM users WHERE email = ? AND deleted_at IS NULL AND is_active = 1',
             [$email],
         );
 
@@ -161,7 +161,7 @@ final class Auth
         if (password_needs_rehash($row['password_hash'], PASSWORD_ARGON2ID)) {
             Database::execute('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash($password, PASSWORD_ARGON2ID), $row['id']]);
         }
-        Database::execute('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = ?', [$row['id']]);
+        Database::execute('UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?', [$row['id']]);
         RateLimiter::reset($accountKey);
 
         self::signIn($request, (int) $row['id']);
