@@ -19,6 +19,15 @@ return [
         'locale' => 'en',
         'key' => (string) env('APP_KEY', ''),
         'dev_toolbar' => $bool(env('DEV_TOOLBAR', false)),
+        // Secret behind the HMAC signature on QR tickets.
+        'ticket_secret' => (string) (env('TICKET_SECRET') ?? env('TICKET_SIGNING_KEY', '')),
+    ],
+
+    'session' => [
+        // Longest gap between two requests before the session is dropped.
+        'idle' => (int) env('SESSION_IDLE_MINUTES', env('SESSION_LIFETIME_MIN', 30)) * 60,
+        // Longest life of a session after sign-in, however active the user is.
+        'absolute' => (int) env('SESSION_ABSOLUTE_HOURS', 8) * 3600,
     ],
 
     'db' => [
@@ -31,8 +40,6 @@ return [
     ],
 
     'security' => [
-        'ticket_signing_key' => (string) env('TICKET_SIGNING_KEY', ''),
-        'session_lifetime_min' => (int) env('SESSION_LIFETIME_MIN', 120),
         'login_max_attempts' => (int) env('LOGIN_MAX_ATTEMPTS', 5),
         'login_lock_minutes' => (int) env('LOGIN_LOCK_MINUTES', 15),
     ],

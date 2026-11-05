@@ -57,9 +57,25 @@ jobs:
           DB_PASS: root
         run: php scripts/test_core.php
 
+      - name: Auth and security tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASS: root
+        run: php scripts/test_auth.php
+
+      - name: Ticket signing tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASS: root
+          TICKET_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+        run: php scripts/test_tickets.php
+
       - name: HTTP smoke test
         env:
           DB_HOST: 127.0.0.1
           DB_USER: root
           DB_PASS: root
+          TICKET_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
         run: bash scripts/smoke_test.sh

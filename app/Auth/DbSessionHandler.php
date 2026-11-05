@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Core\Database;
+use App\Core\Logger;
 use SessionHandlerInterface;
+use Throwable;
 
 /**
  * Keeps PHP sessions in the user_sessions table.
@@ -33,6 +35,20 @@ final class DbSessionHandler implements SessionHandlerInterface
 
     public function read(string $id): string|false
     {
+        // The database may be unreachable. A visitor should still get a page,
+        // and /api/health should still be able to report the real status, so
+        // fall back to an empty session instead of letting the error escape
+        // session_start() as a 500.
+        try {
+            return $this->readRow($id);
+        } catch (Throwable $e) {
+            Logger::error('Session store unavailable on read: ' . $e->getMessage());
+            return '';
+        }
+    }
+
+    private function readRow(string $id): string
+    {
         $payload = Database::fetchValue(
             'SELECT payload FROM user_sessions
               WHERE id = ? AND user_agent_hash = ?
@@ -43,6 +59,16 @@ final class DbSessionHandler implements SessionHandlerInterface
     }
 
     public function write(string $id, string $data): bool
+    {
+        try {
+            $this->writeRow($id, $data);
+        } catch (Throwable $e) {
+            Logger::error('Session store unavailable on write: ' . $e->getMessage());
+        }
+        return true;
+    }
+
+    private function writeRow(string $id, string $data): void
     {
         $uid = isset($_SESSION['uid']) ? (int) $_SESSION['uid'] : null;
         $ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP) ?: '0.0.0.0'; // column is NOT NULL
@@ -58,20 +84,28 @@ final class DbSessionHandler implements SessionHandlerInterface
                last_activity = IF(user_sessions.user_agent_hash = new.user_agent_hash, NOW(), user_sessions.last_activity)',
             ['id' => $id, 'uid' => $uid, 'ip' => $ip, 'ua' => $this->uaHash, 'payload' => $data],
         );
-        return true;
     }
 
     public function destroy(string $id): bool
     {
-        Database::execute('DELETE FROM user_sessions WHERE id = ?', [$id]);
+        try {
+            Database::execute('DELETE FROM user_sessions WHERE id = ?', [$id]);
+        } catch (Throwable $e) {
+            Logger::error('Session store unavailable on destroy: ' . $e->getMessage());
+        }
         return true;
     }
 
     public function gc(int $max_lifetime): int|false
     {
-        return Database::execute(
-            'DELETE FROM user_sessions WHERE last_activity < (NOW() - INTERVAL ? SECOND)',
-            [$this->idleSeconds],
-        );
+        try {
+            return Database::execute(
+                'DELETE FROM user_sessions WHERE last_activity < (NOW() - INTERVAL ? SECOND)',
+                [$this->idleSeconds],
+            );
+        } catch (Throwable $e) {
+            Logger::error('Session store unavailable on gc: ' . $e->getMessage());
+            return 0;
+        }
     }
 }
