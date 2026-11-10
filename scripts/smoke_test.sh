@@ -73,9 +73,27 @@ expect "index.php in the URL still routes"        GET  "$BASE/index.php"        
 expect "path traversal cannot read .env"          GET  "$BASE/../.env"           404 '' 'DB_PASS'
 expect "app code is not reachable from the web"   GET  "$BASE/../app/bootstrap.php" 404 '' 'spl_autoload_register'
 
+# CSRF protection runs before routing, so an unsigned POST never reaches the
+# router. Check that first, then sign a POST to prove the router still answers
+# 405 for a route that only accepts GET.
 request POST "$BASE/"
-if [ "$STATUS" = "405" ] && grep -qi '^Allow: GET, HEAD' "$TMP/headers"; then ok "POST to a GET page is 405 with Allow header"
-else bad "POST to a GET page is 405 with Allow header" "got $STATUS"; fi
+if [ "$STATUS" = "419" ]; then ok "POST without a CSRF token is rejected"
+else bad "POST without a CSRF token is rejected" "expected HTTP 419, got $STATUS"; fi
+
+# A page with a form gives us a session cookie and a matching token.
+curl -s -c "$TMP/jar" -o "$TMP/form" "$BASE/login" >/dev/null
+CSRF="$(sed -n 's/.*name="_csrf"[^>]*value="\([^"]*\)".*/\1/p' "$TMP/form" | head -1)"
+if [ -z "$CSRF" ]; then
+  bad "POST to a GET page is 405 with Allow header" "no CSRF token found on /login"
+else
+  STATUS=$(curl -s -b "$TMP/jar" -X POST --data-urlencode "_csrf=$CSRF" \
+    -D "$TMP/headers" -o "$TMP/body" -w '%{http_code}' "$BASE/")
+  if [ "$STATUS" = "405" ] && grep -qi '^Allow: GET, HEAD' "$TMP/headers"; then
+    ok "POST to a GET page is 405 with Allow header"
+  else
+    bad "POST to a GET page is 405 with Allow header" "got $STATUS"
+  fi
+fi
 
 # Raw socket: curl never reads a HEAD body, so it cannot prove there is none.
 exec 3<>"/dev/tcp/127.0.0.1/$PORT"
