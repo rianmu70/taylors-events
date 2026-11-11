@@ -41,7 +41,8 @@
         <aside class="event-booking">
             <p class="event-booking__date"><?= e(format_datetime($event['starts_at'])) ?></p>
             <p><?= e(format_datetime($event['ends_at'])) ?></p>
-            <p><?= e(t('event.seats_left', ['count' => max(0, (int) $event['capacity'] - (int) $event['confirmed_count'])])) ?></p>
+            <?php $seatsLeft = max(0, (int) $event['capacity'] - (int) $event['confirmed_count']); ?>
+            <p><?= e($seatsLeft === 1 ? t('event.seat_left') : t('event.seats_left', ['count' => $seatsLeft])) ?></p>
             <p><strong><?= e(t('status.' . $event['status'])) ?></strong></p>
 
             <?php if (($registration['status'] ?? null) === 'confirmed'): ?>

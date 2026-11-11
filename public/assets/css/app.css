@@ -417,3 +417,65 @@ main.container { flex: 1; padding-top: 40px; padding-bottom: 96px; }
     .page-head--split, .registration-row, .management-row { align-items: flex-start; flex-direction: column; }
     .form-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- Sign in and create account ---------- */
+
+.auth {
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+.auth h1 {
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+
+.auth__form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth__form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.auth__form small {
+    font-weight: 400;
+    color: var(--color-muted);
+}
+
+.auth__form input,
+.auth__form select {
+    width: 100%;
+    height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--color-ink);
+    background: var(--color-surface);
+}
+
+.auth__form input:focus,
+.auth__form select:focus { border-color: var(--color-ink); }
+
+.auth__form .btn { height: 48px; margin-top: 4px; }
+
+.auth > p { margin-top: 20px; font-size: 15px; }
+
+.notice {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    margin: 0 0 4px;
+}
+
+.notice--error { background: var(--color-danger-bg); color: var(--color-brand-hover); }
+.notice--success { background: var(--color-success-bg); color: var(--color-success); }

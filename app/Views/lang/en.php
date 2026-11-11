@@ -16,6 +16,28 @@ return [
     'app.tagline' => 'Every event on campus, one account.',
     'app.footer' => "Taylor's University, Lakeside Campus",
 
+    // Accounts
+    'auth.login.title' => 'Sign in',
+    'auth.login.submit' => 'Sign in',
+    'auth.login.create_account' => 'New here? Create an account',
+    'auth.register.title' => 'Create your account',
+    'auth.register.submit' => 'Create account',
+    'auth.register.have_account' => 'Already have an account? Sign in',
+    'auth.field.name' => 'Full name',
+    'auth.field.email' => 'Email',
+    'auth.field.password' => 'Password',
+    'auth.field.password_hint' => 'At least 12 characters.',
+    'auth.field.faculty' => 'School',
+    'auth.field.faculty_choose' => 'Choose your school',
+    'auth.error.login_failed' => 'That email and password do not match an account.',
+    'auth.error.email' => 'Enter a valid Taylor\'s email address.',
+    'auth.error.email_taken' => 'An account already exists with that email address.',
+    'auth.error.name' => 'Enter your full name.',
+    'auth.error.password_length' => 'Your password must be at least 12 characters.',
+    'auth.error.password_is_email' => 'Your password must not be your email address.',
+    'auth.error.faculty' => 'Choose your school.',
+    'auth.error.signup_limited' => 'Too many sign-up attempts. Please wait a few minutes.',
+
     // Navigation
     'nav.main' => 'Main',
     'nav.skip' => 'Skip to content',
