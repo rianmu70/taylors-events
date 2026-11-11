@@ -10,7 +10,7 @@ Unzip over the repo root. This adds `app/Auth`, `app/Security`, `app/Middleware`
 
 If either file changed since you sent it to me, copy those lines in by hand instead of overwriting.
 
-Also merge `docs/lang_auth_en.php` into `app/Views/lang/en.php` (flat dotted keys; convert if the file is nested).
+The interface text lives in `app/Views/lang/en.php`. It already has every `auth.*` key except `auth.error.throttled` (see below).
 
 Nothing has been run (no PHP in my sandbox). First: `php -l` on every file, then `php scripts/test_auth.php`.
 
@@ -36,6 +36,7 @@ Roles are explicit: `role:admin` does not let organizers in, and `role:organizer
 
 - Sessions live in `user_sessions` (30 min idle, 8 h absolute, bound to a User-Agent hash). Optional `config('session.idle')` and `config('session.absolute')` in `config/app.php`.
 - `SessionMiddleware` calls `Database::setAuditContext()` with the real user id on every request.
+- Passwords must be 12 to 128 characters (matches the text in `en.php`). Existing seeded accounts use a shorter demo password; the minimum applies to sign-up only.
 - Public sign-up always makes a `student`. Organizer and admin are granted by an admin only.
 - 5 wrong passwords lock the account for 15 minutes. Unknown email, wrong password and locked account show the same message.
 - Role is re-read every request, so a demoted or deleted user is affected immediately.

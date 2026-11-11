@@ -304,7 +304,7 @@ check('too many attempts per account hit the rate limiter (retry_after)', fn () 
     for ($i = 0; $i < 9; $i++) {
         $last = Auth::attempt(req('POST', '/login'), $u['email'], 'bad-password-' . $i);
     }
-    return ($last['retry_after'] ?? 0) > 0 ? true : $last;
+    return ($last['retry_after'] ?? 0) > 0 && ($last['error'] ?? '') === 'auth.error.throttled' ? true : $last;
 }));
 check('logout clears the session data', fn () => rolledBack(function () {
     $u = makeUser();
@@ -320,6 +320,12 @@ check('register creates a student with an Argon2id hash and a lower-case email',
     $row = Database::fetchOne('SELECT role, email, password_hash FROM users WHERE id = ?', [$res['user_id'] ?? 0]);
     return $row !== null && $row['role'] === 'student' && $row['email'] === strtolower($email)
         && str_starts_with($row['password_hash'], '$argon2id$') && (int) ($_SESSION['uid'] ?? 0) === $res['user_id'] ? true : [$res, $row];
+}));
+check('register enforces a 12 character minimum password', fn () => rolledBack(function () {
+    $short = Auth::register(req('POST', '/register'), 'Short Pass', 'short.' . bin2hex(random_bytes(3)) . '@example.test', 'only-11-chr');
+    freshSession();
+    $ok = Auth::register(req('POST', '/register'), 'Long Pass', 'long.' . bin2hex(random_bytes(3)) . '@example.test', 'exactly-12-c');
+    return ($short['errors']['password'] ?? '') === 'auth.error.password_length' && isset($ok['user_id']) ? true : [$short, $ok];
 }));
 check('register refuses a duplicate email', fn () => rolledBack(function () {
     $u = makeUser();

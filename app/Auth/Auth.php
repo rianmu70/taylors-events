@@ -92,7 +92,7 @@ final class Auth
             $errors['email'] = 'auth.error.email';
         }
         $length = mb_strlen($password);
-        if ($length < 10 || $length > 128) {
+        if ($length < 12 || $length > 128) {   // the interface text promises "at least 12 characters"
             $errors['password'] = 'auth.error.password_length';
         } elseif (mb_strtolower($password) === $email) {
             $errors['password'] = 'auth.error.password_is_email';
@@ -138,7 +138,7 @@ final class Auth
             RateLimiter::hit($accountKey, 8, 900),
         );
         if ($wait > 0) {
-            return ['ok' => false, 'error' => self::GENERIC_FAIL, 'retry_after' => $wait];
+            return ['ok' => false, 'error' => 'auth.error.throttled', 'retry_after' => $wait];
         }
 
         $row = Database::fetchOne(
