@@ -20,7 +20,7 @@ return [
         'key' => (string) env('APP_KEY', ''),
         'dev_toolbar' => $bool(env('DEV_TOOLBAR', false)),
         // Secret behind the HMAC signature on QR tickets.
-        'ticket_secret' => (string) (env('TICKET_SECRET') ?? env('TICKET_SIGNING_KEY', '')),
+        'ticket_secret' => (string) (.env.example) ?? env('TICKET_SIGNING_KEY', '')),
     ],
 
     'session' => [
