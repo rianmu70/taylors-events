@@ -1,7 +1,5 @@
 <section class="event-details">
-    <a href="<?= e(url('/')) ?>">
-        &larr; <?= e(t('action.back')) ?>
-    </a>
+    <a class="back-link" href="<?= e(url('/events')) ?>">&larr; <?= e(t('action.back')) ?></a>
 
     <?php if (!empty($bookingError)): ?>
         <p class="notice notice--error" role="alert"><?= e($bookingError) ?></p>
@@ -9,7 +7,13 @@
 
     <div class="event-details-layout">
         <div class="event-details-main">
-            <p><?= e($event['category_name'] ?? '') ?></p>
+            <p class="event-card__meta">
+                <span class="dot" style="background: <?= e($event['category_color'] ?? '#6A7488') ?>"></span>
+                <span class="event-card__category"><?= e($event['category_name'] ?? '') ?></span>
+                <?php if (in_array($event['status'], ['published', 'ongoing'], true)): ?>
+                    <?= partial('partials/status-pill', ['status' => $event['status']]) ?>
+                <?php endif; ?>
+            </p>
 
             <h1><?= e($event['title']) ?></h1>
             <p class="event-summary"><?= e($event['summary']) ?></p>
@@ -39,11 +43,19 @@
         </div>
 
         <aside class="event-booking">
-            <p class="event-booking__date"><?= e(format_datetime($event['starts_at'])) ?></p>
-            <p><?= e(format_datetime($event['ends_at'])) ?></p>
-            <?php $seatsLeft = max(0, (int) $event['capacity'] - (int) $event['confirmed_count']); ?>
-            <p><?= e($seatsLeft === 1 ? t('event.seat_left') : t('event.seats_left', ['count' => $seatsLeft])) ?></p>
-            <p><strong><?= e(t('status.' . $event['status'])) ?></strong></p>
+            <div class="event-booking__when">
+                <p class="event-booking__date"><?= e(format_datetime($event['starts_at'])) ?></p>
+                <p class="event-booking__until"><?= e(t('event.until', ['time' => format_datetime($event['ends_at'], 'g:i a')])) ?></p>
+            </div>
+
+            <div>
+                <?= partial('partials/seat-meter', [
+                    'capacity' => $event['capacity'],
+                    'confirmed' => $event['confirmed_count'],
+                ]) ?>
+            </div>
+
+            <hr>
 
             <?php if (($registration['status'] ?? null) === 'confirmed'): ?>
                 <p class="notice notice--success"><?= e(t('registration.confirmed')) ?></p>

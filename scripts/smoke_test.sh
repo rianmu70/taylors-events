@@ -68,7 +68,7 @@ expect "drafts are not listed"                    GET  "$BASE/"                 
 expect "health check reports the database"        GET  "$BASE/api/health"        200 '"database":"ok"'
 expect "unknown page is 404"                      GET  "$BASE/no-such-page"      404 'Page not found'
 expect "unknown API route returns JSON"           GET  "$BASE/api/no-such-route" 404 '"success":false'
-expect "stylesheet is served"                     GET  "$BASE/assets/css/app.css" 200 '--color-brand'
+expect "stylesheet is served"                     GET  "$BASE/assets/css/app.css" 200 '--brand:'
 expect "index.php in the URL still routes"        GET  "$BASE/index.php"         200 'class="event-card"'
 expect "path traversal cannot read .env"          GET  "$BASE/../.env"           404 '' 'DB_PASS'
 expect "app code is not reachable from the web"   GET  "$BASE/../app/bootstrap.php" 404 '' 'spl_autoload_register'

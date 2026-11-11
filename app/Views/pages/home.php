@@ -1,8 +1,8 @@
 <?php
 /**
- * Home page: upcoming events.
+ * Browse events.
  *
- * @var list<array<string, mixed>> $events Rows from Event::upcoming()
+ * @var list<array<string, mixed>> $events Rows from Event::upcoming() or Event::browse()
  */
 ?>
 <section class="page-head">
@@ -15,32 +15,29 @@
 <?php else: ?>
     <ul class="event-grid">
         <?php foreach ($events as $event): ?>
-            <?php
-            $left = max(0, (int) $event['capacity'] - (int) $event['confirmed_count']);
-            $seats = match (true) {
-                $left === 0 => t('event.full'),
-                $left === 1 => t('event.seat_left'),
-                default => t('event.seats_left', ['count' => $left]),
-            };
-            ?>
             <li class="event-card">
-                <a class="event-card__link" href="<?= e(url('/events/'. $event['slug']))?>">
-                <p class="event-card__meta">
-                    <span class="dot" style="background: <?= e($event['category_color']) ?>"></span>
-                    <?= e($event['category_name']) ?>
-                    <?php if ($event['status'] === 'ongoing'): ?>
-                        <span class="badge badge--live"><?= e(t('status.ongoing')) ?></span>
-                    <?php endif; ?>
-                </p>
-                <h2 class="event-card__title"><?= e($event['title']) ?></h2>
-                <p class="event-card__summary"><?= e($event['summary']) ?></p>
-                <dl class="event-card__facts">
-                    <div><dt><?= e(t('event.when')) ?></dt><dd><?= e(format_datetime($event['starts_at'])) ?></dd></div>
-                    <div><dt><?= e(t('event.where')) ?></dt><dd><?= e($event['venue_name']) ?></dd></div>
-                    <div><dt><?= e(t('event.host')) ?></dt><dd><?= e($event['club_name']) ?></dd></div>
-                </dl>
-                <p class="event-card__seats<?= $left === 0 ? ' is-full' : '' ?>"><?= e($seats) ?></p>
-                    </a>
+                <a class="event-card__link" href="<?= e(url('/events/' . $event['slug'])) ?>">
+                    <p class="event-card__meta">
+                        <span class="dot" style="background: <?= e($event['category_color']) ?>"></span>
+                        <span class="event-card__category"><?= e($event['category_name']) ?></span>
+                        <?php if ($event['status'] === 'ongoing'): ?>
+                            <?= partial('partials/status-pill', ['status' => 'ongoing']) ?>
+                        <?php endif; ?>
+                    </p>
+                    <h2 class="event-card__title"><?= e($event['title']) ?></h2>
+                    <p class="event-card__summary"><?= e($event['summary']) ?></p>
+                    <dl class="event-card__facts">
+                        <div><dt><?= e(t('event.when')) ?></dt><dd><?= e(format_datetime($event['starts_at'])) ?></dd></div>
+                        <div><dt><?= e(t('event.where')) ?></dt><dd><?= e($event['venue_name']) ?></dd></div>
+                        <div><dt><?= e(t('event.host')) ?></dt><dd><?= e($event['club_name']) ?></dd></div>
+                    </dl>
+                    <div class="event-card__seats">
+                        <?= partial('partials/seat-meter', [
+                            'capacity' => $event['capacity'],
+                            'confirmed' => $event['confirmed_count'],
+                        ]) ?>
+                    </div>
+                </a>
             </li>
         <?php endforeach; ?>
     </ul>

@@ -15,9 +15,9 @@
         <?php foreach ($registrations as $registration): ?>
             <li class="registration-row">
                 <div>
-                    <p class="registration-row__status"><?= e(t('registration.' . $registration['registration_status'])) ?></p>
+                    <p class="registration-row__status"><?= partial('partials/status-pill', ['status' => $registration['registration_status'], 'group' => 'registration']) ?></p>
                     <h2><a href="<?= e(url('/events/' . $registration['slug'])) ?>"><?= e($registration['title']) ?></a></h2>
-                    <p><?= e(format_datetime($registration['starts_at'])) ?> · <?= e($registration['venue_name']) ?></p>
+                    <p><?= e(format_datetime($registration['starts_at'])) ?>, <?= e($registration['venue_name']) ?></p>
                 </div>
                 <div class="registration-row__actions">
                     <?php if ($registration['registration_status'] === 'confirmed'): ?>

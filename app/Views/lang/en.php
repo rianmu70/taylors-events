@@ -90,6 +90,8 @@ return [
     'event.seats_left' => ':count seats left',
     'event.seat_left' => '1 seat left',
     'event.full' => 'Full, waitlist open',
+    'event.of_capacity' => ':taken of :total seats taken',
+    'event.until' => 'until :time',
     'event.about' => 'About this event',
     'event.learning_outcomes' => 'You will learn to',
 
