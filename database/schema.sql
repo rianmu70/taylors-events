@@ -218,6 +218,7 @@ CREATE TABLE events (
     slug                    VARCHAR(170) NOT NULL,
     summary                 VARCHAR(300) NOT NULL,
     description             TEXT         NOT NULL,
+    learning_outcomes       TEXT         NULL,
     banner_path             VARCHAR(255) NULL,
     starts_at               DATETIME     NOT NULL,
     ends_at                 DATETIME     NOT NULL,

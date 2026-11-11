@@ -24,6 +24,7 @@
             };
             ?>
             <li class="event-card">
+                <a class="event-card__link" href="<?= e(url('/events/'. $event['slug']))?>">
                 <p class="event-card__meta">
                     <span class="dot" style="background: <?= e($event['category_color']) ?>"></span>
                     <?= e($event['category_name']) ?>
@@ -39,6 +40,7 @@
                     <div><dt><?= e(t('event.host')) ?></dt><dd><?= e($event['club_name']) ?></dd></div>
                 </dl>
                 <p class="event-card__seats<?= $left === 0 ? ' is-full' : '' ?>"><?= e($seats) ?></p>
+                    </a>
             </li>
         <?php endforeach; ?>
     </ul>
