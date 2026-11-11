@@ -85,10 +85,16 @@ into `public/`, so `.env`, logs and source code cannot be downloaded.
 ```bash
 bash scripts/verify_database.sh -u root -p   # 19 database rule checks
 php scripts/test_core.php                    # 55 PHP foundation tests
+php scripts/test_tickets.php                 # signed ticket format and tamper checks
+php scripts/test_event_workflows.php         # rollback-only MySQL booking/lifecycle/check-in tests
 bash scripts/smoke_test.sh                   # 16 HTTP checks on the running app
 ```
 
-All three run automatically on GitHub for every push.
+The event workflow test requires the configured MySQL schema and demo seed data.
+It runs all fixtures in one transaction and always rolls them back; it does not
+reset or retain changes in the configured database. The other test scripts are
+safe to run without the workflow database test. The foundation suite runs
+automatically on GitHub for every push.
 
 ## Verify the database
 

@@ -1,12 +1,16 @@
 <?php
-/**
- * Site header and main menu.
- * Phase 2 adds the signed-in links (My events, Organize, Admin, Sign out)
- * based on the user's role; the labels already exist in lang/en.php.
- */
-$links = [
-    ['path' => '/', 'label' => t('nav.browse')],
-];
+$user = auth_user();
+$role = $user['role'] ?? null;
+$links = [['path' => '/events', 'label' => t('nav.browse')]];
+if ($role === 'student') {
+    $links[] = ['path' => '/my-registrations', 'label' => t('nav.my_events')];
+}
+if (in_array($role, ['organizer', 'admin'], true)) {
+    $links[] = ['path' => '/organize/events', 'label' => t('nav.organize')];
+}
+if ($role === 'admin') {
+    $links[] = ['path' => '/admin/events/pending', 'label' => t('nav.admin')];
+}
 $here = current_path();
 ?>
 <header class="site-header">
@@ -22,6 +26,15 @@ $here = current_path();
             <?php foreach ($links as $link): ?>
                 <a class="site-nav__link" href="<?= e(url($link['path'])) ?>"<?= $here === $link['path'] ? ' aria-current="page"' : '' ?>><?= e($link['label']) ?></a>
             <?php endforeach; ?>
+            <?php if ($user !== null): ?>
+                <form method="post" action="<?= e(url('/logout')) ?>">
+                    <?= csrf_field() ?>
+                    <button class="site-nav__logout" type="submit"><?= e(t('nav.sign_out')) ?></button>
+                </form>
+            <?php else: ?>
+                <a class="site-nav__link" href="<?= e(url('/login')) ?>"><?= e(t('nav.sign_in')) ?></a>
+                <a class="site-nav__link" href="<?= e(url('/register')) ?>"><?= e(t('nav.create_account')) ?></a>
+            <?php endif; ?>
         </nav>
     </div>
 </header>

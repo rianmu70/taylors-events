@@ -14,7 +14,10 @@ declare(strict_types=1);
 
 use App\Controllers\Api\HealthController;
 use App\Controllers\Web\AuthController;
+use App\Controllers\Web\ManagementController;
 use App\Controllers\Web\HomeController;
+use App\Controllers\Web\RegistrationController;
+use App\Controllers\Web\EventController;
 use App\Core\Router;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\CsrfMiddleware;
@@ -34,6 +37,26 @@ return static function (Router $router): void {
 
     // Pages
     $router->get('/', [HomeController::class, 'index']);
+    $router->get('/events', [EventController::class, 'index']);
+    $router->get('/events/{slug}', [EventController::class, 'show']);
+
+    // Student booking and ticket pages
+    $router->post('/events/{slug}/register', [RegistrationController::class, 'store'], ['auth', 'role:student']);
+    $router->get('/my-registrations', [RegistrationController::class, 'index'], ['auth', 'role:student']);
+    $router->get('/registrations/{id:\\d+}/confirmation', [RegistrationController::class, 'confirmation'], ['auth', 'role:student']);
+    $router->get('/registrations/{id:\\d+}/ticket', [RegistrationController::class, 'ticket'], ['auth', 'role:student']);
+    $router->post('/registrations/{id:\\d+}/cancel', [RegistrationController::class, 'cancel'], ['auth', 'role:student']);
+
+    // Organizer and administrator event lifecycle
+    $router->get('/organize/events', [ManagementController::class, 'index'], ['auth', 'role:organizer,admin']);
+    $router->get('/admin/events/pending', [ManagementController::class, 'index'], ['auth', 'role:admin']);
+    $router->get('/organize/events/create', [ManagementController::class, 'createForm'], ['auth', 'role:organizer,admin']);
+    $router->post('/organize/events/create', [ManagementController::class, 'create'], ['auth', 'role:organizer,admin']);
+    $router->get('/organize/events/{id:\\d+}/edit', [ManagementController::class, 'editForm'], ['auth', 'role:organizer,admin']);
+    $router->post('/organize/events/{id:\\d+}/edit', [ManagementController::class, 'update'], ['auth', 'role:organizer,admin']);
+    $router->post('/organize/events/{id:\\d+}/transition', [ManagementController::class, 'transition'], ['auth', 'role:organizer,admin']);
+    $router->get('/organize/events/{id:\\d+}/check-in', [ManagementController::class, 'checkInForm'], ['auth', 'role:organizer,admin']);
+    $router->post('/organize/events/{id:\\d+}/check-in', [ManagementController::class, 'checkIn'], ['auth', 'role:organizer,admin']);
 
     // Accounts
     $router->get('/login', [AuthController::class, 'showLogin']);
