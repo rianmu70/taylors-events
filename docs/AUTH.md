@@ -50,10 +50,15 @@ All column names now match the real tables. Two things the schema forced:
 
 Seeded accounts all use the password `Demo@12345` (admin@taylors.edu.my, organizer@taylors.edu.my, student@sd.taylors.edu.my).
 
+## Sessions in detail
+
+- A guest session that holds nothing (no CSRF token, nobody signed in) is not written to `user_sessions`, so crawlers and health checks do not fill the table.
+- If the database is down, the session store is skipped and the request carries on as a guest. `/api/health` can then still answer 503. Nobody can sign in or submit forms until the database is back (CSRF fails closed).
+
 ## Known side effect of global CSRF checking
 
 The CSRF check runs before routing, so a POST without a token to ANY URL returns 419, even when the URL would have been a 405 or 404.
-`scripts/smoke_test.sh` has a check "POST to a GET page is 405 with Allow header" that will now see 419. Send me smoke_test.sh and I will adjust that one check.
+`scripts/smoke_test.sh` already accounts for this: it checks that an unsigned POST gets 419, then signs one with a token from `/login` and expects the 405.
 
 ## Still to write
 

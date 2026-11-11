@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
+use App\Core\Logger;
+use Throwable;
+
 /**
  * Starts the database-backed session with safe cookie settings.
  * Called by SessionMiddleware, so controllers never start sessions themselves.
@@ -39,7 +42,18 @@ final class Session
             'samesite' => 'Lax',
         ]);
         session_set_save_handler(new DbSessionHandler($idle), true);
-        session_start();
+        try {
+            session_start();
+        } catch (Throwable $e) {
+            // The session store (the database) is unavailable. Carry on as a guest so pages that need no
+            // database, such as /api/health, can still answer. Nobody is signed in and nothing is saved.
+            Logger::exception($e);
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_abort();
+            }
+            $_SESSION = [];
+            return;
+        }
 
         $now = time();
         if (!isset($_SESSION['_born'])) {

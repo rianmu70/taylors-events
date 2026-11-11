@@ -206,6 +206,33 @@ check('session is unreadable from a different User-Agent', fn () => rolledBack(f
     $_SERVER['HTTP_USER_AGENT'] = 'browser-A';
     return $stolen === '' && (new DbSessionHandler(1800))->read($id) === 'secret' ? true : [$stolen];
 }));
+check('an empty guest session is not stored, one with data is', fn () => rolledBack(function () {
+    $h = new DbSessionHandler(1800);
+    $empty = 'test' . bin2hex(random_bytes(8));
+    $full = 'test' . bin2hex(random_bytes(8));
+    $h->write($empty, '_born|i:1730000000;');
+    $h->write($full, '_born|i:1730000000;_csrf|s:3:"abc";');
+    $count = fn (string $id): int => (int) Database::fetchValue('SELECT COUNT(*) FROM user_sessions WHERE id = ?', [$id]);
+    return $count($empty) === 0 && $count($full) === 1 ? true : [$count($empty), $count($full)];
+}));
+check('validateId accepts a stored session, refuses unknown IDs and other browsers', fn () => rolledBack(function () {
+    $id = 'test' . bin2hex(random_bytes(8));
+    $_SERVER['HTTP_USER_AGENT'] = 'browser-A';
+    $a = new DbSessionHandler(1800);
+    $a->write($id, 'data');
+    $_SERVER['HTTP_USER_AGENT'] = 'browser-B';
+    $b = new DbSessionHandler(1800);
+    return $a->validateId($id) === true && $a->validateId('nope' . $id) === false && $b->validateId($id) === false;
+}));
+check('updateTimestamp refreshes the idle clock without touching the data', fn () => rolledBack(function () {
+    $id = 'test' . bin2hex(random_bytes(8));
+    $h = new DbSessionHandler(1800);
+    $h->write($id, 'keep-me');
+    Database::execute('UPDATE user_sessions SET last_activity = NOW() - INTERVAL 20 MINUTE WHERE id = ?', [$id]);
+    $h->updateTimestamp($id, 'keep-me');
+    $age = (int) Database::fetchValue('SELECT TIMESTAMPDIFF(SECOND, last_activity, NOW()) FROM user_sessions WHERE id = ?', [$id]);
+    return $age < 60 && $h->read($id) === 'keep-me' ? true : $age;
+}));
 check('expired session is not returned', fn () => rolledBack(function () {
     $id = 'test' . bin2hex(random_bytes(8));
     $h = new DbSessionHandler(1800);
