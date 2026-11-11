@@ -37,7 +37,7 @@ return [
     'auth.error.password_is_email' => 'Your password must not be your email address.',
     'auth.error.faculty' => 'Choose your school.',
     'auth.error.signup_limited' => 'Too many sign-up attempts. Please wait a few minutes.',
-
+    'auth.error.throttled' => 'Too many attempts. Please wait a few minutes and try again.',
     // Navigation
     'nav.main' => 'Main',
     'nav.skip' => 'Skip to content',
