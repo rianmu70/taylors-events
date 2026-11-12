@@ -1,18 +1,31 @@
 #!/usr/bin/env bash
-# Reload a fresh demo database. Run before every rehearsal and on demo day:
-# seed dates are relative, so "happening now" and "upcoming" stay correct.
+# Put the demo data back exactly as it was, with every date recalculated from now:
 #
-#   Local MySQL:   bash scripts/reset_demo.sh -uroot -p
-#   Docker:        bash scripts/reset_demo.sh --docker
+#     bash scripts/reset_demo.sh
+#
+# Run it before a presentation, or after trying things out. Takes a few seconds.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-if [ "${1:-}" = "--docker" ]; then
-  docker compose -f "$ROOT/docker-compose.yml" exec -T db sh -c \
-    'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /docker-entrypoint-initdb.d/01-schema.sql \
-     && mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /docker-entrypoint-initdb.d/02-seed.sql \
-     && mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /docker-entrypoint-initdb.d/03-app-user.sql'
-else
-  mysql "$@" < "$ROOT/database/schema.sql"
-  mysql "$@" < "$ROOT/database/seed.sql"
+cd "$(dirname "$0")/.."
+
+DB_HOST="${DB_HOST:-$(grep -s '^DB_HOST=' .env | cut -d= -f2- || true)}"
+DB_PORT="${DB_PORT:-$(grep -s '^DB_PORT=' .env | cut -d= -f2- || true)}"
+ROOT_USER="${MYSQL_ROOT_USER:-root}"
+if [ -z "${MYSQL_ROOT_PASSWORD+x}" ]; then
+  read -r -s -p "MySQL password for $ROOT_USER (leave empty if none): " MYSQL_ROOT_PASSWORD; echo
 fi
-echo "Demo database reset."
+export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+MYSQL=(mysql -h"${DB_HOST:-127.0.0.1}" -P"${DB_PORT:-3306}" -u"$ROOT_USER")
+
+"${MYSQL[@]}" < database/schema.sql
+"${MYSQL[@]}" < database/seed.sql
+rm -f storage/cache/lifecycle.clock
+
+"${MYSQL[@]}" -t taylors_events -e "
+  SELECT 'happening now' AS scenario, title FROM events WHERE status = 'ongoing'
+  UNION ALL SELECT 'one seat left', title FROM events WHERE status = 'published' AND capacity - confirmed_count = 1
+  UNION ALL SELECT 'full, with a waitlist', title FROM events e WHERE status = 'published' AND capacity = confirmed_count
+            AND EXISTS (SELECT 1 FROM registrations r WHERE r.event_id = e.id AND r.status = 'waitlisted')
+  UNION ALL SELECT 'draft that clashes', d.title FROM events d JOIN events b ON b.venue_id = d.venue_id AND b.id <> d.id
+            WHERE d.status = 'draft' AND b.status IN ('pending_approval','published','ongoing')
+              AND d.starts_at < b.ends_at AND d.ends_at > b.starts_at;"
+echo "Demo data reloaded."
