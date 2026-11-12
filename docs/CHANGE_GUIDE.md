@@ -31,7 +31,7 @@ All settings are in **`config/app.php`**.
 | When the seat meter turns amber | `'filling_percent' => 70,` |
 | Longest event an organiser can create | `'max_hours' => 12,` |
 | How early the door opens for check-in | `'checkin_opens_minutes' => 60,` |
-| Minimum password length | `'password_min' => 10,` |
+| Minimum password length | `'password_min' => 12,` |
 | How long a reset link lasts | `'reset_minutes' => 30,` |
 | Wrong passwords before an account locks | `'login_max_fails' => 5,` |
 | Which email domains can register | `'email_domains' => [...]` |

@@ -386,7 +386,7 @@ test('accounts: create account validates, hashes with Argon2id and signs in', fu
     $guest->get('/register');
     $bad = $guest->post('/register', ['full_name' => 'Outside Person', 'email' => 'someone@gmail.com', 'password' => 'short', 'faculty_id' => 1]);
     same(422, $bad->status, 'an outside address and a short password');
-    check(str_contains($bad->body, 'ending in taylors.edu.my') && str_contains($bad->body, 'at least 10 characters'), 'the form did not explain both problems');
+    check(str_contains($bad->body, 'ending in taylors.edu.my') && str_contains($bad->body, 'at least 12 characters'), 'the form did not explain both problems');
 
     $ok = $guest->post('/register', ['full_name' => 'New Student', 'email' => 'new.student@sd.taylors.edu.my', 'password' => 'a-long-passphrase', 'faculty_id' => 1, 'student_number' => '0399999']);
     same(303, $ok->status, 'a valid registration');

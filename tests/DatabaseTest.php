@@ -293,3 +293,43 @@ test('ratings: only people who were checked in can rate, from 1 to 5', function 
     refused('RATING', fn () => Database::execute('INSERT INTO event_ratings (event_id, user_id, rating) VALUES (?, ?, 5)', [event_id('Build Night'), $attendee]), 'rating an event that has not ended');
     refused('chk_ratings_range', fn () => Database::execute('INSERT INTO event_ratings (event_id, user_id, rating) VALUES (?, ?, 6)', [$docker, $attendee]), 'a rating of 6');
 });
+
+// ---------------------------------------------------------------- sessions
+
+test('sessions: an empty guest session is not stored, one with data is', function () {
+    rolled_back(function () {
+        $handler = new App\Auth\DbSessionHandler(1800);
+        $empty = 'test' . bin2hex(random_bytes(8));
+        $full = 'test' . bin2hex(random_bytes(8));
+        $handler->write($empty, '_born|i:1730000000;');
+        $handler->write($full, '_born|i:1730000000;_csrf|s:3:"abc";');
+        $count = static fn (string $id): int => (int) Database::fetchValue('SELECT COUNT(*) FROM user_sessions WHERE id = ?', [$id]);
+        same([0, 1], [$count($empty), $count($full)], 'rows for an empty and a non-empty guest session');
+    });
+});
+
+test('sessions: validateId accepts a stored session and refuses unknown ids and other browsers', function () {
+    rolled_back(function () {
+        $id = 'test' . bin2hex(random_bytes(8));
+        $_SERVER['HTTP_USER_AGENT'] = 'browser-A';
+        $a = new App\Auth\DbSessionHandler(1800);
+        $a->write($id, 'data');
+        $_SERVER['HTTP_USER_AGENT'] = 'browser-B';
+        $b = new App\Auth\DbSessionHandler(1800);
+        unset($_SERVER['HTTP_USER_AGENT']);
+        same([true, false, false], [$a->validateId($id), $a->validateId('nope' . $id), $b->validateId($id)], 'own id, unknown id, other browser');
+    });
+});
+
+test('sessions: updateTimestamp refreshes the idle clock without touching the data', function () {
+    rolled_back(function () {
+        $id = 'test' . bin2hex(random_bytes(8));
+        $handler = new App\Auth\DbSessionHandler(1800);
+        $handler->write($id, 'keep-me');
+        Database::execute('UPDATE user_sessions SET last_activity = NOW() - INTERVAL 20 MINUTE WHERE id = ?', [$id]);
+        $handler->updateTimestamp($id, 'keep-me');
+        $age = (int) Database::fetchValue('SELECT TIMESTAMPDIFF(SECOND, last_activity, NOW()) FROM user_sessions WHERE id = ?', [$id]);
+        check($age < 60, "the idle clock was not refreshed ($age seconds old)");
+        same('keep-me', $handler->read($id), 'session data');
+    });
+});

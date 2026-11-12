@@ -54,7 +54,7 @@ return [
     ],
 
     'security' => [
-        'password_min' => 10,
+        'password_min' => 12,
         'reset_minutes' => 30,                 // life of a password reset link
         'login_max_fails' => 5,                // wrong passwords before the account locks
         'login_lock_minutes' => 15,

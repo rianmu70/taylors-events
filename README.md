@@ -184,13 +184,13 @@ Every other likely change is listed in [docs/CHANGE_GUIDE.md](docs/CHANGE_GUIDE.
 bash scripts/test.sh
 ```
 
-75 tests in four suites, run on every push by
+78 tests in four suites, run on every push by
 [GitHub Actions](.github/workflows/ci.yml) against a fresh MySQL 8:
 
 | Suite | Tests | What it proves |
 |---|---:|---|
 | Unit | 16 | Ticket signatures, the state machine, the language file has every key and no template has literal text, nothing loads from another host |
-| Database | 27 | Each forbidden operation is refused by MySQL itself, as the application account, with no PHP involved: overbooking, double-booked rooms, illegal status changes, self approval, editing or deleting the audit log, dropping its triggers |
+| Database | 30 | Each forbidden operation is refused by MySQL itself, as the application account, with no PHP involved: overbooking, double-booked rooms, illegal status changes, self approval, editing or deleting the audit log, dropping its triggers; plus the database session store |
 | Concurrency | 7 | 20 simultaneous bookings for one seat give exactly one seat; the same race with no PHP lock at all still gives one; 8 organisers racing for one room; 10 doors scanning one ticket admit it once |
 | HTTP | 25 | Every page renders for every role; guests, students and organisers get 403 where they should; CSRF, escaping, rate limiting, password reset; each demo scenario end to end |
 
