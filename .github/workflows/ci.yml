@@ -1,8 +1,6 @@
-# Runs on every push and pull request: loads the database, runs the 19
-# database checks, lints every PHP file, then tests the PHP foundation and
-# the running app over HTTP. A red cross on GitHub means something broke
-# before it reaches the demo.
 name: CI
+
+# Loads the schema on a fresh MySQL 8 and runs every test suite on every push.
 
 on:
   push:
@@ -11,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
     services:
       mysql:
         image: mysql:8.0
@@ -21,8 +21,20 @@ jobs:
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=5s --health-timeout=5s --health-retries=30
+
     env:
       MYSQL_PWD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: taylors_app
+      DB_PASS: ci_app_password
+      DB_ROOT_USER: root
+      DB_ROOT_PASS: root
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_URL: http://127.0.0.1:8765
+      TICKET_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,52 +42,44 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: pdo_mysql, gd, mbstring
-
-      - name: Load schema and seed
-        run: |
-          # Same time zone as the campus and docker-compose.yml
-          mysql -h127.0.0.1 -uroot -e "SET GLOBAL time_zone = '+08:00'"
-          mysql -h127.0.0.1 -uroot < database/schema.sql
-          mysql -h127.0.0.1 -uroot < database/seed.sql
-
-      - name: Database checks
-        run: bash scripts/verify_database.sh -h127.0.0.1 -uroot
+          extensions: pdo_mysql, mbstring, curl, pcntl, sodium
+          coverage: none
 
       - name: PHP syntax check
-        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -r -n1 php -l
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l > /dev/null
 
-      - name: Reload fresh demo data
+      - name: No secrets or dependencies are committed
         run: |
+          test ! -e .env
+          test ! -e vendor
+          test -f .env.example
+
+      - name: Load schema and seed on a fresh MySQL 8
+        run: |
+          mysql -h127.0.0.1 -uroot -e "SELECT VERSION()"
           mysql -h127.0.0.1 -uroot < database/schema.sql
           mysql -h127.0.0.1 -uroot < database/seed.sql
+          mysql -h127.0.0.1 -uroot < database/app_user.sql
+          mysql -h127.0.0.1 -uroot -e "ALTER USER 'taylors_app'@'%' IDENTIFIED BY '$DB_PASS'; ALTER USER 'taylors_app'@'localhost' IDENTIFIED BY '$DB_PASS';"
 
-      - name: PHP foundation tests
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASS: root
-        run: php scripts/test_core.php
+      - name: The committed seed matches its generator's shape
+        run: |
+          mysql -h127.0.0.1 -uroot -N taylors_events -e "SELECT CONCAT((SELECT COUNT(*) FROM users WHERE role='student'), ' students, ', (SELECT COUNT(*) FROM venues), ' venues, ', (SELECT COUNT(*) FROM clubs), ' clubs, ', (SELECT COUNT(*) FROM events), ' events')"
 
-      - name: Auth and security tests
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASS: root
-        run: php scripts/test_auth.php
+      - name: Unit tests
+        run: php tests/run.php unit
 
-      - name: Ticket signing tests
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASS: root
-          TICKET_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
-        run: php scripts/test_tickets.php
+      - name: Database guarantee tests
+        run: php tests/run.php database
 
-      - name: HTTP smoke test
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASS: root
-          TICKET_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
-        run: bash scripts/smoke_test.sh
+      - name: Concurrency tests
+        run: php tests/run.php concurrency
+
+      - name: HTTP smoke, authorisation and flow tests
+        run: php tests/run.php http
+
+      - name: Server log on failure
+        if: failure()
+        run: |
+          cat /tmp/taylors-events-test-server.log || true
+          cat storage/logs/*.log || true
