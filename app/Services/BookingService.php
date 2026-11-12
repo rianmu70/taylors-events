@@ -5,132 +5,161 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Domain\RuleViolation;
+use App\Repositories\EventRepository;
+use App\Repositories\RegistrationRepository;
 use App\Security\TicketSigner;
-use DomainException;
 
+/**
+ * Booking, cancelling and the waitlist.
+ *
+ * GUARANTEE 1, a seat cannot be sold twice, is enforced here and again in
+ * the database:
+ *
+ *   PHP       Every operation starts by locking the event row with
+ *             SELECT ... FOR UPDATE. Two students clicking at the same
+ *             moment are therefore handled one after the other, and the
+ *             second one sees the seat count the first one left behind.
+ *   Database  events.confirmed_count is kept by triggers on registrations
+ *             and guarded by CHECK (confirmed_count <= capacity). If this
+ *             class had a bug, the INSERT would still be refused.
+ */
 final class BookingService
 {
-    /** @return array{registration_id:int, status:string} */
-    public static function reserve(int $eventId, int $userId): array
-    {
-        return Database::transaction(static function () use ($eventId, $userId): array {
-            $event = Database::fetchOne(
-                'SELECT id, starts_at, registration_closes_at, capacity, confirmed_count, status
-                   FROM events WHERE id = ? AND deleted_at IS NULL FOR UPDATE',
-                [$eventId],
-            );
-            if ($event === null || $event['status'] !== 'published') {
-                throw new DomainException('event_unavailable');
-            }
-            if (strtotime((string) ($event['registration_closes_at'] ?? $event['starts_at'])) <= time()) {
-                throw new DomainException('registration_closed');
-            }
-
-            $registration = Database::fetchOne(
-                'SELECT id, status FROM registrations WHERE event_id = ? AND user_id = ? FOR UPDATE',
-                [$eventId, $userId],
-            );
-            if ($registration !== null && $registration['status'] !== 'cancelled') {
-                throw new DomainException('already_registered');
-            }
-
-            $confirmed = (int) $event['confirmed_count'] < (int) $event['capacity'];
-            $status = $confirmed ? 'confirmed' : 'waitlisted';
-            $nonce = TicketSigner::newNonce();
-
-            if ($confirmed) {
-                Database::execute('UPDATE events SET confirmed_count = confirmed_count + 1 WHERE id = ?', [$eventId]);
-            }
-
-            if ($registration === null) {
-                $registrationId = Database::insert(
-                    'INSERT INTO registrations (event_id, user_id, status, ticket_nonce) VALUES (?, ?, ?, ?)',
-                    [$eventId, $userId, $status, $nonce],
-                );
-            } else {
-                $registrationId = (int) $registration['id'];
-                Database::execute(
-                    'UPDATE registrations
-                        SET status = ?, ticket_nonce = ?, queued_at = NOW(3), promoted_at = NULL,
-                            cancelled_at = NULL, checked_in_at = NULL, checked_in_by = NULL,
-                            certificate_code = NULL, idempotency_key = NULL
-                      WHERE id = ?',
-                    [$status, $nonce, $registrationId],
-                );
-            }
-
-            return ['registration_id' => $registrationId, 'status' => $status];
-        });
+    public function __construct(
+        private readonly EventRepository $events,
+        private readonly RegistrationRepository $registrations,
+        private readonly Notifier $notifier,
+    ) {
     }
 
-    /** @return array{promoted_registration_id:?int} */
-    public static function cancel(int $eventId, int $userId): array
+    /**
+     * Take a seat, or a place on the waitlist when the event is full.
+     *
+     * @param string|null $idempotencyKey sent by the booking form; a repeat of the same
+     *                                    key returns the first outcome instead of booking twice
+     * @return array{status:string, registration_id:int, replayed:bool}
+     * @throws RuleViolation EVENT_CLOSED, ALREADY_BOOKED
+     */
+    public function book(int $eventId, int $userId, ?string $idempotencyKey = null): array
     {
-        return Database::transaction(static function () use ($eventId, $userId): array {
-            $event = Database::fetchOne(
-                     'SELECT id, starts_at, registration_closes_at, status, confirmed_count
-                   FROM events WHERE id = ? AND deleted_at IS NULL FOR UPDATE',
-                [$eventId],
+        $key = $idempotencyKey !== null && preg_match('/^[0-9a-f-]{36}$/', $idempotencyKey) === 1 ? $idempotencyKey : null;
+
+        return RuleViolation::guard(fn (): array => Database::transaction(function () use ($eventId, $userId, $key): array {
+            // 1. Lock the event. From here until COMMIT nobody else can book it.
+            $event = $this->events->lock($eventId) ?? throw new RuleViolation('EVENT_CLOSED');
+
+            // 2. A repeated submission gets the answer the first one got.
+            if ($key !== null) {
+                $stored = Database::fetchOne('SELECT user_id, response_body FROM idempotency_keys WHERE idem_key = ?', [$key]);
+                if ($stored !== null && (int) $stored['user_id'] === $userId) {
+                    return ['replayed' => true] + json_decode((string) $stored['response_body'], true, 8, JSON_THROW_ON_ERROR);
+                }
+            }
+
+            if ($event['status'] !== 'published' || strtotime((string) $event['starts_at']) <= time()) {
+                throw new RuleViolation('EVENT_CLOSED');
+            }
+
+            $existing = $this->registrations->forUserAndEvent($userId, $eventId, lock: true);
+            if ($existing !== null && $existing['status'] !== 'cancelled') {
+                throw new RuleViolation('ALREADY_BOOKED');
+            }
+
+            // 3. Decide, using the count we hold the lock on.
+            $status = (int) $event['confirmed_count'] < (int) $event['capacity'] ? 'confirmed' : 'waitlisted';
+            $nonce = TicketSigner::newNonce();
+            if ($existing === null) {
+                $registrationId = $this->registrations->insert($eventId, $userId, $status, $nonce);
+            } else {
+                $registrationId = (int) $existing['id'];
+                $this->registrations->rebook($registrationId, $status, $nonce);
+            }
+
+            $result = ['status' => $status, 'registration_id' => $registrationId];
+            if ($key !== null) {
+                Database::execute(
+                    'INSERT INTO idempotency_keys (idem_key, user_id, endpoint, response_code, response_body) VALUES (?, ?, ?, 200, ?)',
+                    [$key, $userId, 'events.book', json_encode($result, JSON_THROW_ON_ERROR)],
+                );
+            }
+
+            $this->notifier->notify(
+                $userId,
+                $status === 'confirmed' ? 'booking_confirmed' : 'booking_waitlisted',
+                ['event' => (string) $event['title'], 'when' => format_datetime((string) $event['starts_at'])],
+                $status === 'confirmed' ? "/my/tickets/$registrationId" : '/my/registrations',
+                email: true,
             );
-            if ($event === null) {
-                throw new DomainException('event_unavailable');
-            }
-            if (strtotime((string) $event['starts_at']) <= time()) {
-                throw new DomainException('event_started');
-            }
+            return ['replayed' => false] + $result;
+        }));
+    }
 
-            $registration = Database::fetchOne(
-                'SELECT id, status, checked_in_at FROM registrations
-                  WHERE event_id = ? AND user_id = ? FOR UPDATE',
-                [$eventId, $userId],
-            );
-            if ($registration === null || $registration['status'] === 'cancelled') {
-                throw new DomainException('registration_not_active');
+    /**
+     * Give a seat or a waitlist place back. A freed seat goes to whoever has
+     * waited longest, inside the same transaction, so it is never on open
+     * sale in between.
+     *
+     * @throws RuleViolation NOT_YOURS, NOT_ACTIVE, ALREADY_CHECKED_IN, EVENT_STARTED
+     */
+    public function cancel(int $registrationId, int $userId): void
+    {
+        $registration = $this->registrations->find($registrationId);
+        if ($registration === null || (int) $registration['user_id'] !== $userId) {
+            throw new RuleViolation('NOT_YOURS');
+        }
+
+        RuleViolation::guard(fn () => Database::transaction(function () use ($registration, $registrationId): void {
+            $event = $this->events->lock((int) $registration['event_id']) ?? throw new RuleViolation('EVENT_CLOSED');
+            $current = $this->registrations->lock($registrationId);
+
+            if ($current === null || $current['status'] === 'cancelled') {
+                throw new RuleViolation('NOT_ACTIVE');
             }
-            if ($registration['checked_in_at'] !== null) {
-                throw new DomainException('already_checked_in');
+            if ($current['checked_in_at'] !== null) {
+                throw new RuleViolation('ALREADY_CHECKED_IN');
             }
-
-            $wasConfirmed = $registration['status'] === 'confirmed';
-            Database::execute(
-                'UPDATE registrations SET status = \'cancelled\', cancelled_at = NOW() WHERE id = ?',
-                [(int) $registration['id']],
-            );
-
-            if (!$wasConfirmed) {
-                return ['promoted_registration_id' => null];
-            }
-
-            Database::execute(
-                'UPDATE events SET confirmed_count = confirmed_count - 1 WHERE id = ? AND confirmed_count > 0',
-                [$eventId],
-            );
-
-            $registrationOpen = $event['status'] === 'published'
-                && strtotime((string) ($event['registration_closes_at'] ?? $event['starts_at'])) > time();
-            if (!$registrationOpen) {
-                return ['promoted_registration_id' => null];
+            if ($event['status'] !== 'published') {
+                throw new RuleViolation('EVENT_STARTED');
             }
 
-            $next = Database::fetchOne(
-                "SELECT id FROM registrations
-                  WHERE event_id = ? AND status = 'waitlisted'
-                  ORDER BY queued_at, id LIMIT 1 FOR UPDATE",
-                [$eventId],
-            );
+            // A new nonce means any saved copy of the old QR code stops working.
+            $this->registrations->cancel($registrationId, TicketSigner::newNonce());
+            $this->notifier->notify((int) $current['user_id'], 'booking_cancelled', ['event' => (string) $event['title']], '/events/' . $event['slug']);
+
+            if ($current['status'] === 'confirmed') {
+                $this->promoteWaiting((int) $event['id']);
+            }
+        }));
+    }
+
+    /**
+     * Move people from the waitlist into free seats, longest wait first.
+     * The caller must already hold the lock on the event row.
+     *
+     * @return int how many people were promoted
+     */
+    public function promoteWaiting(int $eventId): int
+    {
+        $promoted = 0;
+        while (true) {
+            $event = $this->events->lock($eventId);
+            if ($event === null || (int) $event['confirmed_count'] >= (int) $event['capacity']) {
+                return $promoted;
+            }
+            $next = $this->registrations->nextWaiting($eventId);
             if ($next === null) {
-                return ['promoted_registration_id' => null];
+                return $promoted;
             }
-
-            Database::execute(
-                "UPDATE registrations
-                    SET status = 'confirmed', ticket_nonce = ?, promoted_at = NOW()
-                  WHERE id = ? AND status = 'waitlisted'",
-                [TicketSigner::newNonce(), (int) $next['id']],
+            $this->registrations->promote((int) $next['id']);
+            $this->notifier->notify(
+                (int) $next['user_id'],
+                'booking_promoted',
+                ['event' => (string) $event['title'], 'when' => format_datetime((string) $event['starts_at'])],
+                '/my/tickets/' . $next['id'],
+                email: true,
             );
-            Database::execute('UPDATE events SET confirmed_count = confirmed_count + 1 WHERE id = ?', [$eventId]);
-
-            return ['promoted_registration_id' => (int) $next['id']];
-        });
+            $promoted++;
+        }
     }
 }
