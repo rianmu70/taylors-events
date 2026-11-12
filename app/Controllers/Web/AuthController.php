@@ -5,60 +5,73 @@ declare(strict_types=1);
 namespace App\Controllers\Web;
 
 use App\Auth\Auth;
-use App\Core\Database;
 use App\Core\Request;
 use App\Core\Response;
-use App\Core\View;
+use App\Repositories\UserRepository;
+use App\Security\RateLimiter;
 use App\Security\SafeRedirect;
+use App\Services\PasswordResetService;
 
-/** Sign-in, sign-up and sign-out. The views are bare-bones so Member 3 can restyle them. */
 final class AuthController
 {
+    public function __construct(
+        private readonly UserRepository $users,
+        private readonly PasswordResetService $resets,
+    ) {
+    }
+
     public function showLogin(Request $request): Response
     {
         if (Auth::check()) {
-            return redirect('/');
+            return redirect($this->home());
         }
-        return $this->loginPage($request->query('next'), '', null);
+        return view('pages/auth/login', ['next' => $request->string('next'), 'email' => '', 'error' => null]);
     }
 
     public function login(Request $request): Response
     {
-        $email = (string) $request->input('email', '');
-        $result = Auth::attempt($request, $email, (string) $request->input('password', ''));
-
+        $result = Auth::attempt($request, $request->string('email'), (string) $request->input('password', ''));
         if ($result['ok']) {
-            return redirect(SafeRedirect::path($request->input('next'), '/'));
+            return redirect(SafeRedirect::path($request->input('next'), $this->home()));
         }
-
-        $retry = $result['retry_after'] ?? 0;
-        $response = $this->loginPage($request->input('next'), $email, $result['error'] ?? 'auth.error.login_failed')
-            ->withStatus($retry > 0 ? 429 : 422);
-        return $retry > 0 ? $response->withHeader('Retry-After', (string) $retry) : $response;
+        $limited = isset($result['retry_after']);
+        $response = view('pages/auth/login', [
+            'next' => $request->string('next'),
+            'email' => $request->string('email'),
+            'error' => $limited
+                ? t('auth.error.too_many_wait', ['minutes' => (int) ceil($result['retry_after'] / 60)])
+                : t('auth.error.login_failed'),
+        ], $limited ? 429 : 422);
+        return $limited ? $response->withHeader('Retry-After', (string) $result['retry_after']) : $response;
     }
 
-    public function showRegister(Request $request): Response
+    public function showRegister(): Response
     {
         if (Auth::check()) {
-            return redirect('/');
+            return redirect($this->home());
         }
-        return $this->registerPage([], []);
+        return view('pages/auth/register', ['faculties' => $this->users->faculties(), 'old' => [], 'errors' => []]);
     }
 
     public function register(Request $request): Response
     {
-        $old = [
-            'name' => (string) $request->input('name', ''),
-            'email' => (string) $request->input('email', ''),
-        ];
-        $faculty = $request->input('faculty_id');
-        $facultyId = is_string($faculty) && ctype_digit($faculty) ? (int) $faculty : null;
-
-        $result = Auth::register($request, $old['name'], $old['email'], (string) $request->input('password', ''), $facultyId);
-        if (isset($result['user_id'])) {
-            return redirect('/');
+        $result = Auth::register(
+            $request,
+            $request->string('full_name'),
+            $request->string('email'),
+            (string) $request->input('password', ''),
+            $request->int('faculty_id'),
+            $request->string('student_number'),
+        );
+        if (isset($result['errors'])) {
+            return view('pages/auth/register', [
+                'faculties' => $this->users->faculties(),
+                'old' => $request->all(),
+                'errors' => $result['errors'],
+            ], 422);
         }
-        return $this->registerPage($old, $result['errors'] ?? [])->withStatus(422);
+        flash('success', t('auth.register.welcome'));
+        return redirect('/events');
     }
 
     public function logout(Request $request): Response
@@ -67,24 +80,47 @@ final class AuthController
         return redirect('/login');
     }
 
-    private function loginPage(mixed $next, string $email, ?string $error): Response
+    public function showForgot(): Response
     {
-        return Response::html(View::render('pages/auth/login', [
-            'title' => t('auth.login.title'),
-            'next' => is_string($next) ? $next : '',
-            'email' => $email,
-            'error' => $error,
-        ]));
+        return view('pages/auth/forgot', ['sent' => false, 'error' => null]);
     }
 
-    /** @param array<string,string> $old @param array<string,string> $errors lang keys */
-    private function registerPage(array $old, array $errors): Response
+    public function forgot(Request $request): Response
     {
-        return Response::html(View::render('pages/auth/register', [
-            'title' => t('auth.register.title'),
-            'old' => $old,
-            'errors' => $errors,
-            'faculties' => Database::fetchAll('SELECT id, name FROM faculties ORDER BY name'),
-        ]));
+        [$max, $window] = (array) config('security.reset_per_ip');
+        if (RateLimiter::hit('reset:ip:' . $request->ip(), (int) $max, (int) $window) > 0) {
+            return view('pages/auth/forgot', ['sent' => false, 'error' => t('auth.error.too_many')], 429);
+        }
+        $this->resets->request($request->string('email'), $request->ip());
+        // The same answer for every address: the form never reveals who has an account.
+        return view('pages/auth/forgot', ['sent' => true, 'error' => null]);
+    }
+
+    public function showReset(Request $request, string $token): Response
+    {
+        return view('pages/auth/reset', ['token' => $token, 'usable' => $this->resets->isUsable($token), 'error' => null]);
+    }
+
+    public function reset(Request $request, string $token): Response
+    {
+        $password = (string) $request->input('password', '');
+        $error = $password !== (string) $request->input('password_confirm', '')
+            ? t('auth.error.password_mismatch')
+            : $this->resets->reset($token, $password);
+        if ($error !== null) {
+            return view('pages/auth/reset', ['token' => $token, 'usable' => $this->resets->isUsable($token), 'error' => $error], 422);
+        }
+        flash('success', t('auth.reset.done'));
+        return redirect('/login');
+    }
+
+    /** Where each role lands after signing in. */
+    private function home(): string
+    {
+        return match (Auth::user()['role'] ?? '') {
+            'admin' => '/admin',
+            'organizer' => '/organise/events',
+            default => '/events',
+        };
     }
 }

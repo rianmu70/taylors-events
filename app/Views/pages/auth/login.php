@@ -1,25 +1,29 @@
-<?php /** @var string $next @var string $email @var ?string $error */ ?>
+<?php
+/**
+ * @var string $next   where to go after signing in
+ * @var string $email
+ * @var string|null $error
+ */
+page_title($title = t('auth.login.title'));
+?>
 <section class="auth">
-<h1><?= e(t('auth.login.title')) ?></h1>
+    <h1><?= e(t('auth.login.title')) ?></h1>
+    <p class="lead"><?= e(t('auth.login.lead')) ?></p>
 
-<?php if ($error !== null): ?>
-    <p class="notice notice--error" role="alert"><?= e(t($error)) ?></p>
-<?php endif; ?>
+    <?php if ($error !== null): ?><div class="flash flash--error" role="alert"><?= e($error) ?></div><?php endif; ?>
 
-<form class="auth__form" method="post" action="<?= e(url('/login')) ?>">
-    <?= csrf_field() ?>
-    <?php if ($next !== ''): ?>
+    <form class="form" method="post" action="<?= e(url('/login')) ?>">
+        <?= csrf_field() ?>
         <input type="hidden" name="next" value="<?= e($next) ?>">
-    <?php endif; ?>
+        <?= partial('partials/field', ['name' => 'email', 'label' => t('auth.field.email'), 'type' => 'email', 'value' => $email,
+            'attrs' => ['required' => true, 'autocomplete' => 'username', 'autofocus' => true]]) ?>
+        <?= partial('partials/field', ['name' => 'password', 'label' => t('auth.field.password'), 'type' => 'password',
+            'attrs' => ['required' => true, 'autocomplete' => 'current-password']]) ?>
+        <button class="btn btn--primary btn--block" type="submit"><?= e(t('auth.login.submit')) ?></button>
+    </form>
 
-    <label><?= e(t('auth.field.email')) ?>
-        <input type="email" name="email" value="<?= e($email) ?>" autocomplete="username" required>
-    </label>
-    <label><?= e(t('auth.field.password')) ?>
-        <input type="password" name="password" autocomplete="current-password" required>
-    </label>
-    <button class="btn btn--primary" type="submit"><?= e(t('auth.login.submit')) ?></button>
-</form>
-
-<p><a href="<?= e(url('/register')) ?>"><?= e(t('auth.login.create_account')) ?></a></p>
+    <p class="auth__links">
+        <a href="<?= e(url('/forgot-password')) ?>"><?= e(t('auth.login.forgot')) ?></a>
+        <a href="<?= e(url('/register')) ?>"><?= e(t('auth.login.register')) ?></a>
+    </p>
 </section>
