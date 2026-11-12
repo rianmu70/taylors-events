@@ -58,16 +58,14 @@ Open http://localhost:8000. This needs no PHP or MySQL on the machine.
 bash scripts/reset_demo.sh
 ```
 
-With Docker:
+Reloads the demo data in a few seconds, with every date recalculated from the
+current time, and prints the four demonstration scenarios so you can see they
+are in place. With Docker, the same is done by:
 
 ```bash
 docker compose down -v
 docker compose up
 ```
-
-Reloads the demo data in a few seconds, with every date recalculated from the
-current time, and prints the four demonstration scenarios so you can see they
-are in place.
 
 ## Demo accounts
 
