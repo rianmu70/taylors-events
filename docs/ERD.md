@@ -1,145 +1,164 @@
-# Entity Relationship Diagram
+# Data model
+
+Seventeen tables. The diagram shows the relationships; the notes underneath
+explain the decisions that are not obvious from the boxes.
 
 ```mermaid
 erDiagram
     faculties ||--o{ users : "has"
-    users ||--o{ user_sessions : "owns"
-    users ||--o{ events : "organizes"
-    users ||--o{ registrations : "books"
-    users ||--o{ notifications : "receives"
-    users ||--o{ event_ratings : "writes"
-    users ||--o{ idempotency_keys : "sends"
+    users ||--o{ user_sessions : "signed in as"
     users ||--o{ password_resets : "requests"
+    users ||--o{ club_members : "belongs to"
     clubs ||--o{ club_members : "has"
-    users ||--o{ club_members : "joins"
     clubs ||--o{ events : "hosts"
-    events ||--o{ ticket_scans : "logs"
-    registrations ||--o{ ticket_scans : "scanned as"
-    users ||--o{ mail_outbox : "receives"
-    venues ||--o{ events : "hosts"
+    users ||--o{ events : "creates (organizer_id)"
+    users |o--o{ events : "approves (approved_by)"
     event_categories ||--o{ events : "classifies"
+    venues ||--o{ events : "is held in"
     events ||--o{ registrations : "has"
+    users ||--o{ registrations : "books"
     events ||--o{ event_ratings : "receives"
+    users ||--o{ event_ratings : "gives"
+    events ||--o{ ticket_scans : "logs"
+    registrations |o--o{ ticket_scans : "is scanned"
+    users ||--o{ notifications : "receives"
+    users |o--o{ mail_outbox : "is sent"
+    users ||--o{ idempotency_keys : "submits"
 
-    faculties { smallint id PK
-                varchar code UK
-                varchar name }
-    users { int id PK
-            smallint faculty_id FK
-            varchar email UK
-            varchar password_hash
-            enum role
-            tinyint failed_login_count
-            datetime locked_until
-            datetime deleted_at }
-    user_sessions { varchar id PK
-                    int user_id FK
-                    char user_agent_hash
-                    mediumblob payload }
-    rate_limits { varchar bucket_key PK
-                  int hits
-                  datetime blocked_until }
-    venues { smallint id PK
-             varchar code UK
-             smallint capacity
-             enum venue_type }
-    event_categories { smallint id PK
-                       varchar slug UK }
-    clubs { smallint id PK
-            varchar name UK
-            enum kind }
-    club_members { smallint club_id PK
-                   int user_id PK
-                   enum role }
-    password_resets { int id PK
-                      int user_id FK
-                      char token_hash UK
-                      datetime expires_at
-                      datetime used_at }
-    events { int id PK
-             char public_id UK
-             int organizer_id FK
-             smallint club_id FK
-             smallint venue_id FK
-             smallint category_id FK
-             datetime starts_at
-             datetime ends_at
-             smallint capacity
-             smallint confirmed_count
-             enum status
-             datetime deleted_at }
-    registrations { int id PK
-                    int event_id FK
-                    int user_id FK
-                    enum status
-                    char ticket_nonce UK
-                    datetime queued_at
-                    datetime checked_in_at
-                    char certificate_code UK }
-    notifications { bigint id PK
-                    int user_id FK
-                    enum type
-                    datetime read_at }
-    event_ratings { int id PK
-                    int event_id FK
-                    int user_id FK
-                    tinyint rating }
-    audit_logs { bigint id PK
-                 int actor_id
-                 varchar action
-                 json before_data
-                 json after_data }
-    ticket_scans { bigint id PK
-                   int event_id FK
-                   int registration_id FK
-                   enum result
-                   char payload_hash }
-    mail_outbox { bigint id PK
-                  varchar to_email
-                  varchar template
-                  datetime sent_at }
-    idempotency_keys { char idem_key PK
-                       int user_id FK
-                       json response_body }
+    users {
+        int id PK
+        smallint faculty_id FK
+        varchar student_number UK
+        varchar email UK
+        varchar password_hash "Argon2id"
+        enum role "student, organizer, admin"
+        tinyint is_active
+        datetime locked_until
+        datetime deleted_at "soft delete"
+    }
+    clubs {
+        smallint id PK
+        varchar name UK
+        enum kind "club, society, sports, office"
+        datetime deleted_at "soft delete"
+    }
+    club_members {
+        smallint club_id PK
+        int user_id PK
+        enum role "advisor, president, committee, member"
+    }
+    venues {
+        smallint id PK
+        varchar code UK
+        smallint capacity "CHECK > 0"
+        tinyint is_active
+        datetime deleted_at "soft delete"
+    }
+    events {
+        int id PK
+        int organizer_id FK
+        smallint club_id FK
+        smallint venue_id FK
+        smallint category_id FK
+        varchar slug UK
+        datetime starts_at
+        datetime ends_at "CHECK > starts_at"
+        smallint capacity
+        smallint confirmed_count "CHECK <= capacity"
+        enum status "six states"
+        varchar rejection_reason
+        int approved_by FK
+        datetime deleted_at "soft delete"
+    }
+    registrations {
+        int id PK
+        int event_id FK "UNIQUE with user_id"
+        int user_id FK
+        enum status "confirmed, waitlisted, cancelled"
+        char ticket_nonce UK
+        datetime queued_at "waitlist order, ms"
+        datetime checked_in_at
+        char certificate_code UK
+    }
+    audit_logs {
+        bigint id PK
+        int actor_id "no foreign key"
+        varchar action
+        varchar entity_type
+        int entity_id
+        json before_data
+        json after_data
+        varchar ip_address
+    }
+    ticket_scans {
+        bigint id PK
+        int event_id FK
+        int registration_id FK
+        enum result "admitted or one of five refusals"
+        char payload_hash "SHA-256"
+    }
+    password_resets {
+        int id PK
+        int user_id FK
+        char token_hash UK "SHA-256, never the token"
+        datetime expires_at
+        datetime used_at
+    }
 ```
 
-## Key design decisions
+Tables not drawn in detail: `faculties`, `event_categories`, `user_sessions`
+(session id, user, payload, last activity), `rate_limits` (bucket key, hits,
+window start, blocked until), `notifications`, `event_ratings` (rating 1 to 5,
+unique per event and user), `idempotency_keys` (key, user, stored response),
+`mail_outbox`.
 
-| Decision | Reason |
-|---|---|
-| `confirmed_count` counter + `CHECK (confirmed_count <= capacity)` | Booking locks one event row (`FOR UPDATE`) instead of counting rows; the CHECK makes overbooking impossible even if application code is wrong |
-| Waitlist ordered by `queued_at` (ms precision) | No position numbers to renumber after cancellations |
-| One registration row per (event, user) | Re-joining reuses the row; UNIQUE key blocks duplicates |
-| QR signature computed, not stored | A database leak cannot be used to forge tickets |
-| `public_id` UUID in URLs | Prevents enumerating events by incrementing IDs |
-| Triggers re-check lifecycle, capacity and venue clashes | Defence in depth behind the PHP services |
-| Audit trigger reads `@app_user_id` / `@app_ip` | Every change records who and from where, with before/after JSON |
-| `audit_logs` blocks UPDATE/DELETE | Tamper-evident history |
-| No FK on `audit_logs.actor_id` | History survives user deletion |
-| Least-privilege DB user | The app account cannot DROP or ALTER tables |
-| Events belong to a club, with `club_members` roles | Hosting survives committee turnover; only advisors, presidents and committee members can publish for a club |
-| Reset tokens stored as SHA-256 hashes, 30 minute expiry, single use | A database leak cannot be turned into account takeover |
-| Every door scan logged, including rejected ones, append-only | Forgery attempts and duplicate entries leave evidence |
-| Emails captured in `mail_outbox` | Reset and confirmation flows can be demonstrated without an SMTP server |
-| Index column order checked with EXPLAIN ANALYZE | See `docs/PERFORMANCE.md` |
+## Decisions in the schema
 
-## Verified behaviour (MySQL 8.0.46)
+**`events.confirmed_count` is stored, not counted.** Counting confirmed
+registrations on every read would work, but a count cannot be a constraint.
+Storing the number lets the rule "never more bookings than seats" be written as
+`CHECK (confirmed_count <= capacity)`, which MySQL enforces on every write from
+every client. The number is kept true by triggers on `registrations`, not by
+PHP, so no code path can forget to update it.
 
-All 19 checks in `scripts/verify_database.sh` pass, including:
+**`audit_logs.actor_id` has no foreign key.** With a foreign key, deleting a
+user would either be blocked by their history or would delete or blank it.
+Without one, the record of what an account did outlives the account. The audit
+page joins to `users` with a LEFT JOIN and shows "Removed account 123" when the
+user is gone.
 
-| Test | Result |
-|---|---|
-| Insert event directly as published | Rejected (LIFECYCLE) |
-| Event capacity above venue capacity | Rejected (CAPACITY) |
-| Submit draft overlapping a booked venue | Rejected (VENUE_CLASH) |
-| draft to published, skipping approval | Rejected (LIFECYCLE) |
-| Reject without a reason | Rejected |
-| Force confirmed_count above capacity | Rejected (CHECK) |
-| Delete an audit row | Rejected (AUDIT) |
-| Rating by a non-attendee | Rejected (RATING) |
-| Reset token that expires before it is created | Rejected (CHECK) |
-| Delete a door scan record | Rejected (SCANS) |
-| Every check-in has an admitted door scan | Confirmed |
-| Approve, soft delete | Allowed, audited with before/after JSON |
-| 20 parallel bookings for the last seat | 1 confirmed, 19 waitlisted, count = capacity |
-| App DB user runs DROP TABLE | Denied |
+**Events belong to a club, and to a person.** `club_id` decides who may manage
+the event (the club's committee, whoever is on it this year). `organizer_id`
+records who created it, and is the person who must not approve it.
+
+**One registration row per person per event.** `UNIQUE (event_id, user_id)`
+makes a double booking impossible at the lowest level. Cancelling keeps the
+row with status `cancelled`; booking again reuses it. Registrations are never
+deleted (a trigger refuses), so attendance history and the door log stay intact.
+
+**Soft deletes.** `users`, `events`, `venues` and `clubs` have `deleted_at`.
+Rows that other rows and the audit trail point to are hidden, not removed.
+
+**The waitlist has no position column.** Position is derived from
+`queued_at` (millisecond precision) and `id`. A stored position number would
+have to be renumbered on every cancellation, which is exactly the kind of
+update that goes wrong under concurrency.
+
+**Only hashes of secrets are stored.** Passwords as Argon2id. Reset tokens as
+SHA-256. Scanned ticket payloads as SHA-256. The ticket signature is not stored
+at all: it is recomputed from a key that exists only in `.env`.
+
+## Triggers
+
+| Trigger | Table | What it enforces |
+|---|---|---|
+| `trg_events_bi` | events | New events start as drafts; organiser is on the club committee; capacity fits the room; venue clash |
+| `trg_events_bu` | events | Lifecycle state machine; rejection needs a reason; no self approval; capacity fits the room; venue clash |
+| `trg_events_ai`, `trg_events_au` | events | Audit entry with before and after snapshots |
+| `trg_registrations_bi` | registrations | Only open events can be booked |
+| `trg_registrations_ai`, `trg_registrations_au` | registrations | Maintain `confirmed_count` (which fires the CHECK); audit entry |
+| `trg_registrations_bd` | registrations | Bookings are never deleted |
+| `trg_users_au` | users | Audit role changes and deactivation |
+| `trg_ratings_bi` | event_ratings | Only checked-in attendees of a finished event can rate |
+| `trg_audit_no_update`, `trg_audit_no_delete` | audit_logs | Append only |
+| `trg_scans_no_update`, `trg_scans_no_delete` | ticket_scans | Append only |
