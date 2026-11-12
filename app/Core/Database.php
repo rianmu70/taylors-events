@@ -31,6 +31,9 @@ final class Database
     private static ?int $auditUserId = null;
     private static ?string $auditIp = null;
 
+    /** @var array{user:string,pass:string}|null */
+    private static ?array $override = null;
+
     public static function connection(): PDO
     {
         if (self::$pdo === null) {
@@ -181,6 +184,19 @@ final class Database
         self::$pdo = null;
     }
 
+    /**
+     * Connect as a different account from now on. Used by the test suites,
+     * which need a privileged account to build fixtures and the application
+     * account to prove what the application is refused.
+     *
+     * @param array{user:string,pass:string}|null $credentials null restores .env
+     */
+    public static function useCredentials(?array $credentials): void
+    {
+        self::$override = $credentials;
+        self::$pdo = null;
+    }
+
     private static function connect(): PDO
     {
         if (!extension_loaded('pdo_mysql')) {
@@ -194,7 +210,9 @@ final class Database
             (string) config('db.name', 'taylors_events'),
         );
 
-        $pdo = new PDO($dsn, (string) config('db.user', ''), (string) config('db.pass', ''), [
+        $user = self::$override['user'] ?? (string) config('db.user', '');
+        $pass = self::$override['pass'] ?? (string) config('db.pass', '');
+        $pdo = new PDO($dsn, $user, $pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,

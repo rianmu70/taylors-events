@@ -56,6 +56,11 @@ final class Request
         }
 
         $scriptName = str_replace('\\', '/', (string) ($server['SCRIPT_NAME'] ?? ''));
+        // PHP's built-in server reports the requested path as SCRIPT_NAME when it
+        // looks like a file (/.env, /config/app.php). Only the front controller counts.
+        if (!str_ends_with($scriptName, '/index.php')) {
+            $scriptName = '/index.php';
+        }
         [$path, $basePath] = self::split((string) ($server['REQUEST_URI'] ?? '/'), $scriptName);
 
         return new self($method, $path, $basePath, $_GET, $body, $server, $_FILES, $_COOKIE);
@@ -179,5 +184,24 @@ final class Request
     public function attribute(string $key, mixed $default = null): mixed
     {
         return $this->attributes[$key] ?? $default;
+    }
+
+    /** A trimmed string from the body or query. Arrays and missing values become ''. */
+    public function string(string $key, string $default = ''): string
+    {
+        $value = $this->input($key);
+        return is_scalar($value) ? trim((string) $value) : $default;
+    }
+
+    /** A whole number from the body or query, or null when it is not one. */
+    public function int(string $key): ?int
+    {
+        $value = $this->input($key);
+        return is_scalar($value) && preg_match('/^-?\d{1,10}$/', (string) $value) === 1 ? (int) $value : null;
+    }
+
+    public function userAgent(): string
+    {
+        return substr((string) ($this->server['HTTP_USER_AGENT'] ?? ''), 0, 255);
     }
 }

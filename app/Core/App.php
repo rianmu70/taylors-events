@@ -13,9 +13,17 @@ use Throwable;
 final class App
 {
     private static ?Request $current = null;
+    private static ?Container $container = null;
 
-    public function __construct(private readonly Router $router)
+    public function __construct(private readonly Router $router, Container $container)
     {
+        self::$container = $container;
+    }
+
+    /** The service container built in app/bootstrap.php. */
+    public static function container(): Container
+    {
+        return self::$container ??= new Container();
     }
 
     /** The request being handled right now (used by url() and the layout). */

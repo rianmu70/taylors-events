@@ -1,9 +1,21 @@
+# Secrets and machine specific settings
 .env
-/storage/uploads/*
+.env.*
+!.env.example
+
+# Dependencies (none are needed to run; listed so they can never be committed)
+/vendor/
+/node_modules/
+
+# Runtime files
 /storage/logs/*
 /storage/cache/*
-.env.docker
+/storage/uploads/*
+/public/uploads/*
 !/storage/**/.gitkeep
+*.log
+
+# Editors and operating systems
 .DS_Store
 Thumbs.db
 .idea/

@@ -1,21 +1,19 @@
-# One-command local environment:  docker compose up --build
-# App:  http://localhost:8000     MySQL:  localhost:3307 (root / root)
+# Optional: run the whole project with Docker, without installing PHP or MySQL.
+#
+#     docker compose up --build
+#
+# then open http://localhost:8000. The database is created and filled on the
+# first start. To reload the demo data: docker compose down -v && docker compose up
 services:
   db:
     image: mysql:8.0
-    command:
-      - --default-time-zone=+08:00
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: root
-    ports:
-      - "3307:3306"
     volumes:
-      - db_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
-      - ./docker/mysql/03-app-user.sql:/docker-entrypoint-initdb.d/03-app-user.sql:ro
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/2-seed.sql:ro
+      - ./database/app_user.sql:/docker-entrypoint-initdb.d/3-app-user.sql:ro
+      - db-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
       interval: 5s
@@ -25,20 +23,28 @@ services:
   app:
     build:
       context: .
-      dockerfile: docker/php/Dockerfile
-    ports:
-      - "8000:80"
-    environment:
-      DB_HOST: db
-      DB_PORT: "3306"
-      DB_NAME: taylors_events
-      DB_USER: taylors_app
-      DB_PASS: taylors_dev_password
+      dockerfile_inline: |
+        FROM php:8.3-cli
+        RUN docker-php-ext-install pdo_mysql
+    working_dir: /app
     volumes:
-      - ./:/var/www/html
+      - .:/app
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      DB_HOST: db
+      DB_USER: taylors_app
+      DB_PASS: change_me
+      # Demo value only. scripts/setup.sh generates a real one for a normal install.
+      TICKET_SECRET: docker-demo-secret-0123456789abcdef0123456789abcdef
+      PHP_CLI_SERVER_WORKERS: "4"
+    command: php -S 0.0.0.0:8000 -t public public/index.php
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
-  db_data:
+  db-data:

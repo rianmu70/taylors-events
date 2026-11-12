@@ -1,12 +1,5 @@
-# Apache: send every request that is not a real file to index.php.
+# Apache: send every request that is not a real file to the front controller.
 Options -Indexes
-DirectoryIndex index.php
-
-# Re-allow this folder if the project-root .htaccess denied everything.
-<IfModule mod_authz_core.c>
-    Require all granted
-</IfModule>
-
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} !-f

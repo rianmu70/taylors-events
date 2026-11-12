@@ -168,7 +168,7 @@ final class Router
             if (!class_exists($class)) {
                 throw new LogicException("Controller not found: $class");
             }
-            $controller = new $class();
+            $controller = App::container()->get($class);
             if (!method_exists($controller, $action)) {
                 throw new LogicException("Action not found: $class::$action");
             }
