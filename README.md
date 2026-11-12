@@ -237,5 +237,25 @@ docs/              proposal, ERD, design decisions, performance, change guide
 | [docs/CHANGE_GUIDE.md](docs/CHANGE_GUIDE.md) | Which line to edit for each likely change |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branches, commits, pull requests |
 
-The work before this version is kept on the
-[`before-reference-build`](https://github.com/rianmu70/taylors-events/tree/before-reference-build) branch.
+## Real campus data and sources
+
+Venue names, locations, clubs and school names come from Taylor's University's
+public website (campus facilities and clubs pages, checked 15 Oct 2026):
+
+https://university.taylors.edu.my/en/student-life/campus-facilities.html
+https://university.taylors.edu.my/en/student-life/your-taylors-journey/clubs-societies-and-sports.html
+
+The capacities of The Grand Hall (1,000) and the lecture theatres (300) are
+published by the university. All other capacities are reasonable estimates for
+the demo. People, student numbers and events are fictional.
+
+## Group 4 module ownership
+
+| Member | Student ID | Ownership |
+|---|---|---|
+| Mubarak Rian Abdulmuhsen Ahmed | 374215 | Database, infrastructure, PHP foundation (router, database layer, views, language file, error handling, tests) |
+| Danah Abdul Rahim Kollochi | 388012 | Sessions, sign-in and registration, roles, security middleware (CSRF, rate limiting, headers) |
+| Banda Shalom Z | 386232 | Booking, waitlist, venue clash, event lifecycle, tickets and check-in, front-end pages |
+
+Each member commits through their own branch and pull requests so the Git
+history reflects individual contribution. See [CONTRIBUTING.md](CONTRIBUTING.md).
