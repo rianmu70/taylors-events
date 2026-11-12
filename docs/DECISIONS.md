@@ -58,7 +58,7 @@ in the trigger `trg_events_bu`. A test walks all 30 pairs of different
 statuses and fails if the two ever disagree.
 
 `published -> ongoing` and `ongoing -> completed` are caused by time. Instead
-of a cron job, which a marker's laptop will not have, a middleware runs two
+of a cron job, which a fresh installation would not have, a middleware runs two
 indexed UPDATE statements at most every 20 seconds. It runs before the session
 is read, so the audit log records these changes as made by the system.
 

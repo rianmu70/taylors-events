@@ -3,7 +3,7 @@
 #
 #     bash scripts/reset_demo.sh
 #
-# Run it before a presentation, or after trying things out. Takes a few seconds.
+# Run it before a demonstration, or after testing. Takes a few seconds.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

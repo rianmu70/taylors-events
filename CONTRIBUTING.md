@@ -38,7 +38,7 @@ All four suites must pass locally. If you changed any wording, the unit suite
 checks that every key you used exists in `app/Views/lang/en.php` and that no
 template contains literal text.
 
-## Before demo day
+## Before a demonstration
 
 ```bash
 bash scripts/reset_demo.sh
@@ -47,4 +47,4 @@ bash scripts/reset_demo.sh
 ```
 
 The test suites reload the demo data themselves, but running the reset last
-recalculates every date from the moment you start the presentation.
+recalculates every date from the moment the demonstration starts.

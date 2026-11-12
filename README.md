@@ -52,10 +52,17 @@ docker compose up --build
 
 Open http://localhost:8000. This needs no PHP or MySQL on the machine.
 
-### Before a presentation
+### Resetting the demo data
 
 ```bash
 bash scripts/reset_demo.sh
+```
+
+With Docker:
+
+```bash
+docker compose down -v
+docker compose up
 ```
 
 Reloads the demo data in a few seconds, with every date recalculated from the
@@ -168,9 +175,9 @@ http://localhost:8000/organise/events/new
 
 Another student's ticket, http://localhost:8000/my/tickets/2, is also 403.
 
-### 7. A change during the presentation
+### 7. Making a small change
 
-| Asked for | Edit, then reload the page |
+| Change | Edit, then reload the page |
 |---|---|
 | Rename the "Book a seat" button | `app/Views/lang/en.php`, the line `'booking.book' => 'Book a seat',` |
 | List 12 events per page instead of 8 | `config/app.php`, the line `'per_page' => 8,` |

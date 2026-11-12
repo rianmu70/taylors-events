@@ -1,7 +1,6 @@
 # Where to change things
 
-Every change a lecturer is likely to ask for during the presentation is one
-line in one file. Reload the page to see it; there is no build step.
+Each common change is one line in one file. Reload the page to see it; there is no build step.
 
 ## Wording
 
