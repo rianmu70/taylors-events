@@ -470,6 +470,7 @@ test('flow: a clashing draft is refused with the name of the event in the way', 
     same("/organise/events/$draft/edit", $response->location(), 'where a refused submission lands');
     $page = $organiser->get($response->location());
     check(str_contains($page->body, 'already held by') && str_contains($page->body, 'Capture the Flag'), 'the refusal does not name the clashing event');
+    same(1, substr_count($page->body, 'already held by'), 'times the clash is explained on the page');
     same('draft', Database::fetchValue('SELECT status FROM events WHERE id = ?', [$draft]), 'the draft afterwards');
 });
 
@@ -533,6 +534,7 @@ test('flow: check in by QR code, and a second scan of the same ticket is refused
     $first = $organiser->postJson("/organise/events/$event/check-in", ['payload' => $payload])->json();
     same([true, 'admitted', 'Aina Sofea Rahman'], [$first['admitted'], $first['result'], $first['name']], 'the first scan');
     same(21, $first['counts']['checked_in'], 'the door count after the scan');
+    same((int) $registration['id'], $first['registration_id'], 'the registration named in the answer, used to update the guest list');
     $second = $organiser->postJson("/organise/events/$event/check-in", ['payload' => $payload])->json();
     same([false, 'duplicate'], [$second['admitted'], $second['result']], 'the same ticket scanned again (a screenshot)');
 

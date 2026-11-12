@@ -140,7 +140,10 @@ final class EventController
             $action();
         } catch (RuleViolation $e) {
             deny_unless_allowed($e);
-            flash('error', $e->text());
+            // The edit page explains a venue clash itself, so it is not repeated as a flash.
+            if (!in_array($e->rule, ['VENUE_CLASH', 'VENUE_CLASH_WITH'], true) || $failureRedirect === '/organise/events') {
+                flash('error', $e->text());
+            }
             return redirect($failureRedirect);
         }
         flash('success', t($successKey));

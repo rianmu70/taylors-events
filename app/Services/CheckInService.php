@@ -49,7 +49,7 @@ final class CheckInService
     }
 
     /**
-     * @return array{result:string, name:?string}
+     * @return array{result:string, name:?string, registration_id:?int}
      *         result is admitted, duplicate, invalid_signature, wrong_event,
      *         not_confirmed or event_not_live
      */
@@ -66,7 +66,7 @@ final class CheckInService
         return $this->admit($eventId, $ticket['registration_id'], $ticket['nonce'], $scannerId, $payload, $ip);
     }
 
-    /** @return array{result:string, name:?string} */
+    /** @return array{result:string, name:?string, registration_id:?int} */
     public function scanDoorCode(int $eventId, string $code, int $scannerId, ?string $ip): array
     {
         $clean = strtolower((string) preg_replace('/[^0-9a-fA-F]/', '', $code));
@@ -87,7 +87,7 @@ final class CheckInService
         return $event['status'] === 'published' && time() >= $opens;
     }
 
-    /** @return array{result:string, name:?string} */
+    /** @return array{result:string, name:?string, registration_id:?int} */
     private function admit(int $eventId, int $registrationId, string $nonce, int $scannerId, string $payload, ?string $ip): array
     {
         return Database::transaction(function () use ($eventId, $registrationId, $nonce, $scannerId, $payload, $ip): array {
@@ -117,10 +117,10 @@ final class CheckInService
         });
     }
 
-    /** @return array{result:string, name:?string} */
+    /** @return array{result:string, name:?string, registration_id:?int} */
     private function finish(int $eventId, ?int $registrationId, int $scannerId, string $result, string $payload, ?string $ip, ?string $name = null): array
     {
         $this->registrations->logScan($eventId, $registrationId, $scannerId, $result, TicketSigner::payloadHash($payload), $ip);
-        return ['result' => $result, 'name' => $name];
+        return ['result' => $result, 'name' => $name, 'registration_id' => $registrationId];
     }
 }

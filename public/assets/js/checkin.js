@@ -50,6 +50,13 @@
       .then(function (response) { return response.json(); })
       .then(function (data) {
         show(data.admitted === true, data.message || root.dataset.textOffline);
+        if (data.admitted && data.registration_id) {
+          var pill = root.parentNode.querySelector('tr[data-registration="' + data.registration_id + '"] .pill');
+          if (pill) {
+            pill.className = 'pill pill--checked_in';
+            pill.textContent = data.status_label;
+          }
+        }
         if (data.counts) {
           countIn.textContent = data.counts.checked_in;
           countTotal.textContent = data.counts.confirmed;

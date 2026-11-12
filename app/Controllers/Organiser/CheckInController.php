@@ -47,6 +47,8 @@ final class CheckInController
             'result' => $outcome['result'],
             'admitted' => $outcome['result'] === CheckInService::ADMITTED,
             'name' => $outcome['name'],
+            'registration_id' => $outcome['registration_id'],
+            'status_label' => t('status.checked_in'),
             'message' => t('scan.' . $outcome['result'], ['name' => $outcome['name'] ?? '']),
             'counts' => $this->registrations->doorCounts((int) $id),
         ]);

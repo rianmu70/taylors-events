@@ -68,7 +68,7 @@ page_title($title = t('checkin.title'));
                     </tr></thead>
                     <tbody>
                         <?php foreach ($attendees as $row): ?>
-                            <tr>
+                            <tr data-registration="<?= e($row['id']) ?>">
                                 <td><?= e($row['full_name']) ?><br><span class="muted"><?= e($row['student_number'] ?? $row['email']) ?></span></td>
                                 <td class="code"><?= e($row['status'] === 'confirmed' ? App\Services\CheckInService::doorCode((string) $row['ticket_nonce']) : '') ?></td>
                                 <td><?= partial('partials/pill', ['status' => $row['checked_in_at'] !== null ? 'checked_in' : $row['status']]) ?></td>
