@@ -1,17 +1,16 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.querySelector('#ticket-qr');
-    if (!canvas) return;
-
-    if (!window.QRCode) {
-        document.querySelector('#ticket-qr-error').hidden = false;
-        return;
+/*
+ * Draws the QR code on the ticket page from the signed text in data-qr.
+ * The QR library is bundled in vendor/, so this works with no network.
+ */
+(function () {
+  'use strict';
+  var box = document.querySelector('[data-qr]');
+  if (!box || !window.QRCode) { return; }
+  window.QRCode.toString(
+    box.getAttribute('data-qr'),
+    { type: 'svg', errorCorrectionLevel: 'M', margin: 1 },
+    function (error, svg) {
+      if (!error) { box.innerHTML = svg; }
     }
-
-    window.QRCode.toCanvas(canvas, canvas.dataset.ticketPayload, {
-        width: 256,
-        margin: 2,
-        errorCorrectionLevel: 'M',
-    }, (error) => {
-        if (error) document.querySelector('#ticket-qr-error').hidden = false;
-    });
-});
+  );
+})();
