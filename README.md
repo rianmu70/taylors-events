@@ -59,8 +59,8 @@ bash scripts/reset_demo.sh
 ```
 
 Reloads the demo data in a few seconds, with every date recalculated from the
-current time, and prints the four demonstration scenarios so you can see they
-are in place. With Docker, the same is done by:
+current time, and prints a short summary so you can see the demo data is
+in place. With Docker, the same is done by:
 
 ```bash
 docker compose down -v
@@ -81,107 +81,6 @@ Every account uses the password **`Demo@12345`**.
 
 The demo data holds 300 students across 15 schools, 14 venues, 14 clubs and
 24 events.
-
-## Demo scenarios
-
-Each one takes under a minute. Use two browser windows (one private) when two
-people are involved.
-
-### 1. A seat cannot be sold twice
-
-*Capture the Flag* has one seat left.
-
-1. As `student@`, open the event. The meter is red: **1 seat left**. Click **Book a seat**. The ticket appears.
-2. As `student2@`, open the same event. It now says **Full**. Click **Join the waitlist**: **You are number 1 on the waitlist**.
-3. As `student@`, go to **My registrations** and click **Cancel my seat**.
-4. As `student2@`, open **Notifications**: **A seat is yours**. The seat went to the waitlist inside the same transaction, so it was never on open sale.
-
-Then show that the database refuses on its own, even without the PHP:
-
-```bash
-mysql -u taylors_app -p"$(grep ^DB_PASS= .env | cut -d= -f2)" taylors_events \
-  -e "INSERT INTO registrations (event_id, user_id, status, ticket_nonce) VALUES (3, 17, 'confirmed', MD5(RAND()))"
-```
-
-```
-ERROR 3819 (HY000): Check constraint 'chk_events_no_overbook' is violated.
-```
-
-And the real race, 20 processes fighting for one seat:
-
-```bash
-bash scripts/test.sh concurrency
-```
-
-### 2. A venue cannot be double booked
-
-1. As `organizer@`, open **Hosted events**. *Git and GitHub Workshop* is a draft in the Cybersecurity Lab, the same afternoon as *Capture the Flag*.
-2. Click **Submit for approval**. It is refused: *That room is already held by "Capture the Flag: Beginner Cybersecurity Challenge" (Taylor's Agents of Tech), Fri ... Pick another room or time.*
-
-The same rule, straight to the database:
-
-```bash
-mysql -u taylors_app -p"$(grep ^DB_PASS= .env | cut -d= -f2)" taylors_events \
-  -e "UPDATE events SET status = 'pending_approval' WHERE slug = 'git-and-github-workshop'"
-```
-
-```
-ERROR 1644 (45000): VENUE_CLASH: the venue is already booked for an overlapping time
-```
-
-### 3. The audit log cannot be altered
-
-1. As `admin@`, open **Audit log**. Every change is there, with who, when, from which address, and the values before and after.
-2. Try to change it, as the application's own database account:
-
-```bash
-mysql -u taylors_app -p"$(grep ^DB_PASS= .env | cut -d= -f2)" taylors_events \
-  -e "DELETE FROM audit_logs WHERE id = 1"
-mysql -u taylors_app -p"$(grep ^DB_PASS= .env | cut -d= -f2)" taylors_events \
-  -e "DROP TRIGGER trg_audit_no_delete"
-```
-
-```
-ERROR 1644 (45000): AUDIT_IMMUTABLE: the audit log is append only
-ERROR 1142 (42000): TRIGGER command denied to user 'taylors_app'@'localhost' for table 'audit_logs'
-```
-
-### 4. Check-in that cannot be faked
-
-1. As `student@`, open **My registrations**, then **Show my ticket** for *Build Night*, which is happening now. Note the door code under the QR code.
-2. As `organizer@`, open **Hosted events**, then **Check in guests** for *Build Night*. Click **Start camera** and hold the ticket up, or type the door code. **Welcome, Aina Sofea Rahman. Checked in.** The count goes up by one.
-3. Scan or type the same code again: **Already used.** This is what happens to a screenshot passed to a friend.
-
-The camera works on `localhost`. On a phone over the network a browser needs
-HTTPS for the camera, so use the door code there.
-
-### 5. Approval, and nobody approves their own event
-
-1. As `admin@`, open **Approvals**. Send *Five-a-side Futsal Mixer* back with a reason, and approve *Machine Learning Study Jam*. It appears on **Browse events** straight away.
-2. As `organizer@`, type http://localhost:8000/admin/approvals into the address bar: **403**. The database would refuse it too (rule `SELF_APPROVAL`).
-
-### 6. Every page checks the role on the server
-
-As `student@`, type any of these into the address bar. Each answers **403**,
-not a redirect and not a working page:
-
-```
-http://localhost:8000/admin
-http://localhost:8000/admin/users
-http://localhost:8000/organise/events/new
-```
-
-Another student's ticket, http://localhost:8000/my/tickets/2, is also 403.
-
-### 7. Making a small change
-
-| Change | Edit, then reload the page |
-|---|---|
-| Rename the "Book a seat" button | `app/Views/lang/en.php`, the line `'booking.book' => 'Book a seat',` |
-| List 12 events per page instead of 8 | `config/app.php`, the line `'per_page' => 8,` |
-| Change the brand colour | `public/assets/css/app.css`, the line `--brand: #c1121f;` |
-
-Every other likely change is listed in [docs/CHANGE_GUIDE.md](docs/CHANGE_GUIDE.md).
 
 ## Test results
 
